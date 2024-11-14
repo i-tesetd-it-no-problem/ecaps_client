@@ -25,7 +25,7 @@
 
 #### 2.1.3 数据传输
 - 使用`mbtdtls`第三方开源组件+`http`协议 与服务器进行数据交互
-- 数据格式为`json`, 定义参考[JsonSchema定义](third_part/cJson/JsonSchema.json)
+- 数据格式为`json`, 定义参考[JsonSchema定义](docs_third_part/cJson/JsonSchema.json)
 
 ### 2.2 服务端
 ##### 2.2.1 数据存储
@@ -52,8 +52,8 @@
 mkdir third_part
 ```
 
-- 本项目使用mbedtls作为TLS协议栈与服务器进行通信, 需要手动编译安装, 具体请参考[mbedtls文档](third_part/mbedtls/README.md)中的编译章节
-- 本项目使用cJson作为json解析库, 需要手动编译安装, 具体请参考[cJson文档](third_part/cJson/README.md)
+- 本项目使用mbedtls作为TLS协议栈与服务器进行通信, 需要手动编译安装, 具体请参考[mbedtls文档](docs_third_part/mbedtls/README.md)中的编译章节
+- 本项目使用cJson作为json解析库, 需要手动编译安装, 具体请参考[cJson文档](docs_third_part/cJson/README.md)
 
 #### 3.2.2 编译设备端
 严格按照第三方库的编译指南进行编译之后, 即可编译设备端程序，参考如下命令:
@@ -92,7 +92,7 @@ TODO
 
 ### 4.1 证书生成
 本项目使用TLS协议与服务器进行通信, 因此需要在服务器上生成证书
-服务端使用自建CA证书并同时为服务端和设备端生成证书, 具体请参考[服务端证书生成文档](third_part/mbedtls/cert.md),请在服务端目录下执行该文档内容
+服务端使用自建CA证书并同时为服务端和设备端生成证书, 具体请参考[服务端证书生成文档](docs_third_part/mbedtls/cert.md),请在服务端目录下执行该文档内容
 
 ### 4.2 复制证书
 请将服务端生成的`ca.pem`,`client.crt`,`client.key`复制保存到本工程工具目录`tools/certification`下

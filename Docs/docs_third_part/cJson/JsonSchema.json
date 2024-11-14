@@ -1,0 +1,66 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "timestamp": {
+        "type": "number",
+        "description": "Unix 时间戳"
+      },
+      "lmv358": {
+        "type": "object",
+        "description": "电压电流传感器",
+        "properties": {
+          "current": { "type": "number", "description": "电流测量值", "minimum": 0 },
+          "voltage": { "type": "number", "description": "电压测量值", "minimum": 0 }
+        },
+        "required": ["current", "voltage"]
+      },
+      "ap3216c": {
+        "type": "object",
+        "description": "环境光/接近/红外传感器",
+        "properties": {
+          "illuminance": { "type": "number", "description": "光照强度" },
+          "proximity": { "type": "number", "description": "接近度" },
+          "infrared": { "type": "number", "description": "红外强度" }
+        },
+        "required": ["illuminance", "proximity", "infrared"]
+      },
+      "si7006": {
+        "type": "object",
+        "description": "温湿度传感器",
+        "properties": {
+          "temperature": { "type": "number", "description": "温度值" },
+          "humidity": { "type": "number", "description": "湿度值" }
+        },
+        "required": ["temperature", "humidity"]
+      },
+      "rda226": {
+        "type": "object",
+        "description": "人体红外传感器",
+        "properties": {
+          "detected": { "type": "boolean", "description": "检测到人体" }
+        },
+        "required": ["detected"]
+      },
+      "itr9608": {
+        "type": "object",
+        "description": "光闸/火焰传感器",
+        "properties": {
+          "light_detected": { "type": "boolean", "description": "光电开关检测状态" },
+          "flame_detected": { "type": "boolean", "description": "火焰检测状态" }
+        },
+        "required": ["light_detected", "flame_detected"]
+      },
+      "max30102": {
+        "type": "object",
+        "description": "心率/血氧传感器",
+        "properties": {
+          "heart_rate": { "type": "number", "description": "心率" },
+          "blood_oxygen": { "type": "number", "description": "血氧水平" }
+        },
+        "required": ["heart_rate", "blood_oxygen"]
+      }
+    },
+    "required": ["timestamp", "lmv358", "ap3216c", "si7006", "rda226", "itr9608", "max30102"]
+  }
+  

@@ -11,7 +11,7 @@
 struct sensor_data *get_sensor_data(void);
 
 /**
- * @brief 获取当前传感器数据转换的Json字符串 (遵循 Docs/third_part/cJson/JsonSchema.json 规范)
+ * @brief 获取当前传感器数据转换的Json字符串 (遵循 Docs/docs_third_part/cJson/JsonSchema.json 规范)
  * 
  * @return char* 成功返回Json字符串，失败返回NULL
  */
