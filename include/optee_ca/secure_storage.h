@@ -32,20 +32,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-// scp ./tools/certification/client.crt wenshuyu@192.168.1.6:/home/wenshuyu/
-#define CLIENT_CER_OBJ_ID   "client_crt"
-#define CLIENT_CER_PATH     "/home/wenshuyu/client.crt"
-
-// scp ./tools/certification/ca.pem wenshuyu@192.168.1.6:/home/wenshuyu/
-#define ROOT_CA_OBJ_ID      "root_ca"
-#define ROOT_CA_PATH        "/home/wenshuyu/ca.pem"
-
-// scp ./tools/certification/client.key wenshuyu@192.168.1.6:/home/wenshuyu/
-#define CLIENT_KEY_OBJ_ID   "priv_ley"
-#define CLIENT_KEY_PATH     "/home/wenshuyu/client.key"
-
 /**
- * @brief find certification and save ti to TEE then delete it from file system
+ * @brief 读取本地文件并存储到OPTEE中再删除本地文件
  * 
  * @param object_id TEE Object ID
  * @param local_file_path file path in local file system
@@ -55,7 +43,7 @@
 bool storage_and_delete(const char* object_id, const char* local_file_path);
 
 /**
- * @brief read object
+ * @brief 读取OPTEE中的文件到缓冲
  * 
  * @param object_id TEE Object ID
  * @param buf read buffer
@@ -64,5 +52,14 @@ bool storage_and_delete(const char* object_id, const char* local_file_path);
  * @return false 
  */
 bool read_tee_object(const char* object_id,unsigned char *buf, size_t *size);
+
+/**
+ * @brief 删除OPTEE中的存储对象
+ * 
+ * @param object_id TEE Object ID
+ * @return true 
+ * @return false 
+ */
+bool delete_tee_object(const char* object_id);
 
 #endif /* _SECURE_STORAGE_H_ */

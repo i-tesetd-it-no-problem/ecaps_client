@@ -34,9 +34,6 @@
 #include <stdbool.h>
 #include <string.h>
 
-#define DEFAULT_LOG_FILE "/tmp/ecaps.log"   // 默认日志文件路径
-#define LOG_MESSAGE_MAX_SIZE 512            // 日志消息最大长度
-
 #ifdef PROJECT_ROOT
 static inline const char* __get_rel_(const char* file) {
     const char* root = strstr(file, PROJECT_ROOT);

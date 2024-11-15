@@ -1,9 +1,10 @@
-#include "utilities/logger.h"
+#include "utils/logger.h"
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include "user_config.h"
 
 #define THREAD_NUMS 10
 
@@ -49,7 +50,7 @@ void test_long_message()
 {
 	printf("\n=== Testing long log message ===\n");
 
-	char long_message[LOG_MESSAGE_MAX_SIZE * 2];
+	char long_message[LOG_MAX_SIZE * 2];
 	memset(long_message, 'A', sizeof(long_message) - 1);
 	long_message[sizeof(long_message) - 1] = '\0';
 

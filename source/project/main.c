@@ -5,39 +5,45 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include "utilities/logger.h"
+#include "utils/logger.h"
 #include "ssl/ssl_client.h"
-#include "cjson/cJSON.h"
-#include "json/create_json.h"
+#include "json/sensor_json.h"
+#include "user_config.h"
 
 static void test_secure_storage(void)
 {
 #ifdef BOARD_ENV
-#include "ca/secure_storage.h"
+#include "optee_ca/secure_storage.h"
 #define READ_BUFFER (1024 * 3)
-	static size_t size = READ_BUFFER;
-	static char read_buf[READ_BUFFER] = { 0 };
 
-	// 保存客户端证书到 OPTEE
-	storage_and_delete(CLIENT_CER_OBJ_ID, CLIENT_CER_PATH);
-	memset(read_buf, 0, READ_BUFFER);
-	size = READ_BUFFER;
-	read_tee_object(CLIENT_CER_OBJ_ID, read_buf, &size); // 读取证书
-	printf("%s", read_buf);
+	// delete_tee_object(CA_PEM_OBJ_ID);
+	// delete_tee_object(CLIENT_CER_OBJ_ID);
+	// delete_tee_object(CLIENT_KEY_OBJ_ID);
+
+	// static size_t size = READ_BUFFER;
+	// static unsigned char read_buf[READ_BUFFER] = { 0 };
 
 	// 保存自建根证书到 OPTEE
-	storage_and_delete(ROOT_CA_OBJ_ID, ROOT_CA_PATH);
-	memset(read_buf, 0, READ_BUFFER);
-	size = READ_BUFFER;
-	read_tee_object(ROOT_CA_OBJ_ID, read_buf, &size); // 读取证书
-	printf("%s", read_buf);
+	storage_and_delete(CA_PEM_OBJ_ID, BOARD_CA_PEM_PATH);
+	// memset(read_buf, 0, READ_BUFFER);
+	// size = READ_BUFFER;
+	// read_tee_object(CA_PEM_OBJ_ID, read_buf, &size); // 读取证书
+	// printf("%s", read_buf);
+
+	// 保存客户端证书到 OPTEE
+	storage_and_delete(CLIENT_CER_OBJ_ID, BOARD_CLIENT_CER_PATH);
+	// memset(read_buf, 0, READ_BUFFER);
+	// size = READ_BUFFER;
+	// read_tee_object(CLIENT_CER_OBJ_ID, read_buf, &size); // 读取证书
+	// printf("%s", read_buf);
 
 	// 保存客户端私钥到 OPTEE
-	storage_and_delete(CLIENT_KEY_OBJ_ID, CLIENT_KEY_PATH);
-	memset(read_buf, 0, READ_BUFFER);
-	size = READ_BUFFER;
-	read_tee_object(CLIENT_KEY_OBJ_ID, read_buf, &size); // 读取证书
-	printf("%s", read_buf);
+	storage_and_delete(CLIENT_KEY_OBJ_ID, BOARD_CLIENT_KEY_PATH);
+	// memset(read_buf, 0, READ_BUFFER);
+	// size = READ_BUFFER;
+	// read_tee_object(CLIENT_KEY_OBJ_ID, read_buf, &size); // 读取证书
+	// printf("%s", read_buf);
+	// printf("\n");
 #else
 
 #endif

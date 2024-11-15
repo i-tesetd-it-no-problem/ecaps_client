@@ -29,9 +29,10 @@
  */
 
 #include <string.h>
-#include <ca/random.h>
 #include <tee_client_api.h>
-#include "utilities/logger.h"
+
+#include "utils/logger.h"
+#include "optee_ca/random.h"
 
 #ifdef BOARD_ENV
 

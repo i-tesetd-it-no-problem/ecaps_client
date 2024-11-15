@@ -32,9 +32,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <tee_client_api.h>
-#include "utilities/logger.h"
-
-#include "ca/secure_storage.h"
+#include "utils/logger.h"
+#include "user_config.h"
+#include "optee_ca/secure_storage.h"
 
 #ifdef BOARD_ENV // 开发板环境
 
@@ -331,16 +331,20 @@ bool storage_and_delete(const char *object_id, const char *local_file_path)
 	if (!res)
 		goto err_free;
 
+	res = close_cert_storage(&context);
+	if (!res)
+		goto err_free;
+
 	// 释放资源
 	terminate_tee_session(&context);
 	close(fd);
 
-	LOG_I("save %s to tee success\n", CLIENT_CER_PATH);
+	LOG_I("save %s to tee success\n", local_file_path);
 
-	if (remove(CLIENT_CER_PATH))
-		LOG_W("delete %s filed!!!\n", CLIENT_CER_PATH);
+	if (remove(local_file_path))
+		LOG_W("delete %s filed!!!\n", local_file_path);
 
-	LOG_I("delete %s success\n", CLIENT_CER_PATH);
+	LOG_I("delete %s success\n", local_file_path);
 	return true;
 
 err_free:
@@ -396,6 +400,44 @@ bool read_tee_object(const char *object_id,unsigned char *buf, size_t *size)
 	}
 
 	*size = op.params[1].tmpref.size;
+
+	terminate_tee_session(&context);
+
+	return true;
+
+err_free_ctx:
+	terminate_tee_session(&context);
+
+	return false;
+}
+
+bool delete_tee_object(const char* object_id)
+{
+	if (!object_id)
+		return false;
+
+	bool b_res;
+	TEEC_Result res;
+	TEEC_Operation op;
+	uint32_t err_origin;
+
+	// 初始化TEE通信
+	b_res = prepare_tee_session(&context);
+	if (!b_res)
+		return b_res;
+
+	memset(&op, 0, sizeof(op));
+	op.paramTypes = TEEC_PARAM_TYPES(TEEC_MEMREF_TEMP_INPUT, TEEC_NONE, TEEC_NONE, TEEC_NONE);
+	op.params[0].tmpref.buffer = (void*)object_id;
+	op.params[0].tmpref.size = strlen(object_id) + 1;
+
+	res = TEEC_InvokeCommand(&context.sess, SECURE_STORAGE_CMD_DELETE, &op, &err_origin);
+	if(res != TEEC_SUCCESS) {
+		LOG_E("obj_delete failed with code 0x%x origin 0x%x", res, err_origin);
+		goto err_free_ctx;
+	}
+
+	LOG_I("delete object %s success\n", object_id);
 
 	terminate_tee_session(&context);
 

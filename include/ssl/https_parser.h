@@ -32,8 +32,6 @@
 
 #include <stddef.h>
 
-#define HTTPS_MAX_CONTENT_SIZE  (1024)  // 内容最大长度
-
 typedef struct _resp_parser *https_resp_handle; // HTTPS解析句柄
 
 /**

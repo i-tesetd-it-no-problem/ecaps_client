@@ -34,18 +34,6 @@
 #include <stdbool.h>
 #include <pthread.h>
 
-#define RESPONSE_BUFFER     (1024 * 2) // HTTPS 响应缓冲区大小
-
-#ifdef PROJECT_ROOT
-#define ROOT_CA_HOST_PATH           PROJECT_ROOT "/tools/certification/ca.pem"
-#define CLIENT_CRT_HOST_PATH        PROJECT_ROOT "/tools/certification/client.crt"
-#define CLIENT_KEY_HOST_PATH        PROJECT_ROOT "/tools/certification/client.key" 
-#else
-#define ROOT_CA_HOST_PATH           NULL
-#define CLIENT_CRT_HOST_PATH        NULL
-#define CLIENT_KEY_HOST_PATH        NULL
-#endif
-
 typedef struct ssl_client_t *ssl_handle; // 客户端句柄
 
 /**

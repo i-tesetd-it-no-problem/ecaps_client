@@ -29,7 +29,7 @@
 
 #include <string.h>
 #include <stdlib.h>
-#include "utilities/queue.h"
+#include "utils/queue.h"
 
 static size_t Q_MIN(size_t a, size_t b)
 {

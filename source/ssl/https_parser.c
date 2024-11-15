@@ -31,8 +31,9 @@
 #include <string.h>
 #include <stdlib.h>
 #include "ssl/https_parser.h"
-#include "utilities/logger.h"
+#include "utils/logger.h"
 #include <ctype.h>
+#include "user_config.h"
 
 #define HTTPS_MAX_HEADER_SIZE   (512)  // 头部最大长度
 
@@ -189,7 +190,7 @@ int https_response_parser_update(https_resp_handle parser, const unsigned char *
                             }
                             char *endptr;
                             long content_length = strtol(content_length_str, &endptr, 10);
-                            if (endptr == content_length_str || content_length < 0 || content_length > HTTPS_MAX_CONTENT_SIZE) {
+                            if (endptr == content_length_str || content_length < 0) {
                                 LOG_E("Invalid Content-Length value: '%s'.", content_length_str);
                                 parser->state = PARSER_STATE_ERROR;
                                 return -1;

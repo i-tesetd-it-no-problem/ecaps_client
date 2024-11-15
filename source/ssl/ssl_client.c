@@ -32,8 +32,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#include "utilities/logger.h"
-#include "utilities/make_request.h"
+#include "utils/logger.h"
+#include "ssl/build_request.h"
 #include "ssl/https_parser.h"
 #include "ssl/url_parser.h"
 #include "ssl/ssl_client.h"
@@ -42,18 +42,27 @@
 #include "mbedtls/error.h"
 #include "mbedtls/ctr_drbg.h"
 #include "mbedtls/entropy.h"
-
-#include "ca/random.h"
-#include "ca/secure_storage.h"
+#include "user_config.h"
+#include "optee_ca/random.h"
+#include "optee_ca/secure_storage.h"
 
 #define MBEDTLS_ERR_BUF_SIZE (512) // 错误信息缓冲区大小
 char err_buf[MBEDTLS_ERR_BUF_SIZE]; // 错误信息缓冲区
 
-unsigned char response_buffer[RESPONSE_BUFFER]; // HTTPS响应缓冲区
-
 pthread_mutex_t ssl_client_mutex = PTHREAD_MUTEX_INITIALIZER; // 互斥锁
 
 #define OPTEE_OBJ_BUFFER (1024 * 3)
+
+#ifdef PROJECT_ROOT
+#define CA_PEM_PATH             PROJECT_ROOT "/" REL_CA_PEM_PATH
+#define CLIENT_CRT_PATH         PROJECT_ROOT "/" REL_CLIENT_CRT_PATH
+#define CLIENT_KEY_PATH         PROJECT_ROOT "/" REL_CLIENT_KEY_PATH
+#else
+#define CA_PEM_PATH             NULL
+#define CLIENT_CRT_PATH         NULL
+#define CLIENT_KEY_PATH         NULL
+#endif
+
 
 enum request_type {
 	REQUEST_GET,
@@ -102,7 +111,7 @@ static bool get_pem_key(enum file_type type, unsigned char *buf, size_t *buf_len
 	char *obj;
 
 	if (type == CA_PEM)
-		obj = ROOT_CA_OBJ_ID;
+		obj = CA_PEM_OBJ_ID;
 	else if (type == CLIENT_CERT)
 		obj = CLIENT_CER_OBJ_ID;
 	else if (type == CLIENT_KEY)
@@ -124,25 +133,25 @@ static bool get_pem_key(enum file_type type, unsigned char *buf, size_t *buf_len
 	char *file_path;
 
 	if (type == CA_PEM)
-		file_path = ROOT_CA_HOST_PATH;
+		file_path = CA_PEM_PATH;
 	else if (type == CLIENT_CERT)
-		file_path = CLIENT_CRT_HOST_PATH;
+		file_path = CLIENT_CRT_PATH;
 	else if (type == CLIENT_KEY)
-		file_path = CLIENT_KEY_HOST_PATH;
+		file_path = CLIENT_KEY_PATH;
 	else
 		return false;
 
 	// 打开文件
 	int fd = open(file_path, O_RDONLY);
 	if (fd < 0) {
-		LOG_E("open %s failed\n", ROOT_CA_HOST_PATH);
+		LOG_E("open %s failed\n", CA_PEM_PATH);
 		return false;
 	}
 
 	// 获取文件大小
 	off_t file_size = lseek(fd, 0, SEEK_END);
 	if (file_size == -1) {
-		LOG_E("can't get %s size\n", ROOT_CA_HOST_PATH);
+		LOG_E("can't get %s size\n", CA_PEM_PATH);
 		goto err_close_fd;
 	}
 	lseek(fd, 0, SEEK_SET);
@@ -155,7 +164,7 @@ static bool get_pem_key(enum file_type type, unsigned char *buf, size_t *buf_len
 
 	out_size = read(fd, buf, file_size);
 	if (out_size < 0) {
-		LOG_E("read %s failed\n", ROOT_CA_HOST_PATH);
+		LOG_E("read %s failed\n", CA_PEM_PATH);
 		goto err_close_fd;
 	}
 
@@ -321,7 +330,7 @@ static int ssl_client_fetch(ssl_handle client, enum request_type req_type, const
 			}
 		} else {
 			// 空POST请求
-			ret = BUILD_POST(url, request_str, sizeof(request_str)); // 空POST请求
+			ret = BUILD_POST_EMPTY(url, request_str, sizeof(request_str)); // 空POST请求
 			if (ret != 0) {
 				LOG_E("Build empty POST request failed\n");
 				free_url_info(url_info);
@@ -657,7 +666,7 @@ int ssl_client_connect(ssl_handle client, const char *url)
 		return -1;
 	}
 
-    // 设置SSL的I/O接口
+    // 设置SSL的I/O接口 可替换为自己的回调
 	mbedtls_ssl_set_bio(&client->ssl, &client->net_ctx, mbedtls_net_send, mbedtls_net_recv,
 			    NULL);
 

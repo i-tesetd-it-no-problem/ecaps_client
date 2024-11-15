@@ -36,9 +36,10 @@
 #include <fcntl.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
-#include "utilities/logger.h"
+#include "utils/logger.h"
+#include "user_config.h"
 
-#define LOG_FINAL_MAX_SIZE (LOG_MESSAGE_MAX_SIZE + 256)
+#define LOG_FINAL_MAX_SIZE (LOG_MAX_SIZE + 256)
 
 typedef struct {
     enum log_level level;
@@ -151,7 +152,7 @@ void logger_log(enum log_level level, const char *file, int line, const char *fm
 
     pid_t thread_id = get_thread_id();
 
-    char message_buffer[LOG_MESSAGE_MAX_SIZE];
+    char message_buffer[LOG_MAX_SIZE];
     va_list args;
     va_start(args, fmt);
     vsnprintf(message_buffer, sizeof(message_buffer), fmt, args);
