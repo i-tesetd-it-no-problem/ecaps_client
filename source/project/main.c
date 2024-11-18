@@ -148,35 +148,6 @@ static void test_ssl(void)
 #undef POST_URL
 }
 
-static void test_merchant(void)
-{
-#include "protocol/payment/merchant.h"
-	struct merchant_info info = {
-		.merc_name = "wenshuyu",
-		.merc_phone = "15616302420",
-	};
-
-	char *json_data = build_merchant_json(&info);
-
-	if(!json_data)
-		return;
-
-	printf("%s\n", json_data);
-
-	free(json_data);
-	json_data = NULL;
-}
-
-static void test_payer(void)
-{
-#include "protocol/payment/payer.h"
-}
-
-static void test_pay(void)
-{
-	test_merchant(); // 商户信息测试
-}
-
 int main(void)
 {
 	// test_secure_storage(); // 保存证书等文件到OPTEE并读取
@@ -185,7 +156,6 @@ int main(void)
 
 	// led_spark(); // LED 闪烁
 
-	test_pay(); // 支付测试
 	return 0;
 }
 
