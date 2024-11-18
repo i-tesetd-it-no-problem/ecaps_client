@@ -88,7 +88,7 @@ bool logger_set_level(enum log_level level);
  */
 void logger_enable_timestamp(bool enable);
 
-// 日志宏
+// 日志宏(自带换行)
 #define LOG_D(fmt, ...) logger_log(LOG_LEVEL_DEBUG, RELATIVE_FILE, __LINE__, fmt, ##__VA_ARGS__)
 #define LOG_I(fmt, ...) logger_log(LOG_LEVEL_INFO,  RELATIVE_FILE, __LINE__, fmt, ##__VA_ARGS__)
 #define LOG_W(fmt, ...) logger_log(LOG_LEVEL_WARN,  RELATIVE_FILE, __LINE__, fmt, ##__VA_ARGS__)

@@ -105,3 +105,6 @@ curl --cert tools/certification/client.crt --key tools/certification/client.key 
 xxx替换为服务器公网IP
 
 输出结果为 `{"message":"Mutual TLS connection successful"}` 则代表证书配置成功
+
+## 5. 功能测试
+本项目使用`Unity`工具进行单元测试, 具体参考[Unity](Docs/docs_third_part/unity/README.md)
