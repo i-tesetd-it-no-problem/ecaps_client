@@ -82,7 +82,8 @@ static void led_spark(void)
 
 static void test_ssl(void)
 {
-#define SERVER_ADDR "49.51.40.135" // 服务器 IP 地址
+// #define SERVER_ADDR "xx.xx.xx.xx" // 服务器 IP 地址
+#define SERVER_ADDR "127.0.0.1" // 服务器 IP 地址(这里改为本地)
 #define SERVER_PORT "8001" // 服务器端口号
 #define SERVER_URL "https://" SERVER_ADDR ":" SERVER_PORT
 #define GET_URL SERVER_URL "/test"
@@ -152,7 +153,7 @@ int main(void)
 {
 	// test_secure_storage(); // 保存证书等文件到OPTEE并读取
 
-	// test_ssl(); // SSL 连接测试
+	test_ssl(); // SSL 连接测试
 
 	// led_spark(); // LED 闪烁
 
