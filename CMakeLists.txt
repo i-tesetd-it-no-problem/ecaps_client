@@ -49,7 +49,7 @@ add_library(pub_lib STATIC ${TOP_SOURCE_FILES})
 target_include_directories(pub_lib PRIVATE ${TOP_INCLUDE_DIRS})
 
 # 主工程
-add_executable(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/source/project/main.c)
+add_executable(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/source/app/main.c)
 target_include_directories(${PROJECT_NAME} PRIVATE ${TOP_INCLUDE_DIRS})
 
 # 链接库
@@ -78,3 +78,15 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/unity_test.cmake)
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_SIZE} ${EXECUTABLE_OUTPUT_PATH}/${PROJECT_NAME}
 )
+
+# 主机
+# rm -rf build;cmake -B build -S . -G Ninja -DCMAKE_TOOLCHAIN_FILE=toolchain_host.cmake -DHOST_BUILD=ON -DCMAKE_BUILD_TYPE=Debug
+# rm -rf build;cmake -B build -S . -G Ninja -DCMAKE_TOOLCHAIN_FILE=toolchain_host.cmake -DHOST_BUILD=ON -DCMAKE_BUILD_TYPE=Release
+
+# 开发板
+# rm -rf build;cmake -B build -S . -G Ninja -DCMAKE_TOOLCHAIN_FILE=toolchain_board.cmake -DHOST_BUILD=OFF -DCMAKE_BUILD_TYPE=Debug
+# rm -rf build;cmake -B build -S . -G Ninja -DCMAKE_TOOLCHAIN_FILE=toolchain_board.cmake -DHOST_BUILD=OFF -DCMAKE_BUILD_TYPE=Release
+
+# cmake --build build --target clean
+# scp ./build/output/ECAPS wenshuyu@192.168.1.6:/home/wenshuyu/ecaps_client
+# scp ./build/output/test_logger wenshuyu@192.168.1.6:/home/wenshuyu/ecaps_client

@@ -1,0 +1,100 @@
+# 缩进设置
+UseTab:          Always            # 使用制表符进行缩进
+IndentWidth:     4                 # 缩进宽度为 4
+TabWidth:        4                 # 一个制表符等于 4 个空格
+ContinuationIndentWidth: 4         # 换行续行缩进为 4
+IndentCaseLabels: false            # 不缩进 switch 语句的 case 标签
+
+# 行宽限制
+ColumnLimit:     100               # 每行最多 80 个字符
+
+# 大括号样式
+BreakBeforeBraces: Linux           # 使用 Linux 风格的大括号位置
+
+# 空格设置
+SpaceBeforeParens: ControlStatements  # 在控制语句的括号前添加空格
+SpaceAfterCStyleCast: false           # C 风格的强制类型转换后不加空格
+SpaceBeforeAssignmentOperators: true  # 赋值操作符前后添加空格
+SpaceAroundPointerQualifiers: Before  # 指针限定符前添加空格
+
+# 指针和引用对齐
+DerivePointerAlignment: false
+PointerAlignment: Right             # 指针和引用符号与变量名对齐
+
+# 预处理器指令
+IndentPPDirectives: None            # 不缩进预处理器指令
+
+# 标签和 goto
+IndentGotoLabels: false             # 标签不缩进，置于行首
+
+# 注释设置
+ReflowComments: false               # 不重新格式化注释
+
+# 空行设置
+KeepEmptyLinesAtTheStartOfBlocks: false  # 代码块开头不保留空行
+
+# 短函数设置
+AllowShortFunctionsOnASingleLine: None   # 不允许将短函数写在一行
+
+# 头文件排序
+SortIncludes: false                 # 不自动排序头文件
+
+# 对齐设置
+AlignTrailingComments: true         # 对齐尾随注释
+AlignConsecutiveAssignments: false  # 不对齐连续的赋值语句
+AlignOperands: false                # 不对齐操作数
+AlignAfterOpenBracket: DontAlign    # 括号内不对齐
+
+# 字符串字面量
+BreakStringLiterals: false          # 不拆分字符串字面量
+
+# 大括号包裹设置
+BraceWrapping:
+  AfterClass:      false
+  AfterControlStatement: false
+  AfterEnum:       false
+  AfterFunction:   false
+  AfterNamespace:  false
+  AfterStruct:     false
+  AfterUnion:      false
+  BeforeCatch:     false
+  BeforeElse:      false
+  IndentBraces:    false
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+  SplitEmptyNamespace: false
+
+# 宏定义
+StatementMacros: []
+
+# 惩罚参数
+PenaltyBreakComment:        300
+PenaltyBreakFirstLessLess:  120
+PenaltyBreakString:         1000
+PenaltyExcessCharacter:     1000000
+PenaltyReturnTypeOnItsOwnLine: 200
+
+# 函数名换行缩进
+IndentWrappedFunctionNames: false
+
+# 保留的空行数
+MaxEmptyLinesToKeep: 1
+
+# 命名空间缩进（对 C 无影响，但设置为 None）
+NamespaceIndentation: None
+
+# 访问修饰符缩进（对 C 无影响，但设置为 -8）
+AccessModifierOffset: -8
+
+# 参数和声明换行设置
+AllowAllParametersOfDeclarationOnNextLine: false
+
+# 单行控制语句
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+
+# 返回类型换行
+AlwaysBreakAfterReturnType: None
+
+# C++11 花括号列表（对 C 无影响，但设置为 false）
+Cpp11BracedListStyle: false
