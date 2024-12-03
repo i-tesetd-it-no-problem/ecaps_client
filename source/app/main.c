@@ -6,8 +6,24 @@
 
 #include "utils/logger.h"
 #include "app/app_led.h"
+#include "app/app_beep.h"
+#include "app/app_fans.h"
+#include "app/app_vibration_motor.h"
 
-void *test_led(void *arg)
+enum test_cmd {
+	TEST_CMD_LED_NORMAL, // 0 正常闪烁
+	TEST_CMD_LED_SCROLL, // 1 跑马灯
+	TEST_CMD_BEEP_ON,	 // 2 开启蜂鸣器
+	TEST_CMD_BEEP_OFF,	 // 3 关闭蜂鸣器
+	TEST_CMD_FANS_ON,	 // 4 开启风扇
+	TEST_CMD_FANS_OFF,	 // 5 关闭风扇
+	TEST_CMD_MOTOR_ON,	 // 6 开启马达
+	TEST_CMD_MOTOR_OFF,	 // 7 关闭马达
+
+	TEST_CMD_LED_MAX,
+};
+
+void *test(void *arg)
 {
 	while (1) {
 		int state;
@@ -18,36 +34,67 @@ void *test_led(void *arg)
 				; // 清空输入缓冲区
 			continue;
 		}
-		led_chg_state(state);
+
+		switch (state) {
+		case TEST_CMD_LED_NORMAL:
+			led_chg_state(LED_STATE_NORMAL);
+			break;
+		case TEST_CMD_LED_SCROLL:
+			led_chg_state(LED_STATE_SCROL);
+			break;
+		case TEST_CMD_BEEP_ON:
+			beep_control(true);
+			break;
+		case TEST_CMD_BEEP_OFF:
+			beep_control(false);
+			break;
+		case TEST_CMD_FANS_ON:
+			fans_control(true);
+			break;
+		case TEST_CMD_FANS_OFF:
+			fans_control(false);
+			break;
+		case TEST_CMD_MOTOR_ON:
+			vibration_motor_control(true);
+			break;
+		case TEST_CMD_MOTOR_OFF:
+			vibration_motor_control(false);
+			break;
+		default:
+			break;
+		}
 	}
 }
 
+/********************主任务********************/
+
 int main()
 {
-	logger_enable_timestamp(true);	  // 开启时间
-	logger_set_level(LOG_LEVEL_INFO); // 日志设置为信息等级
+	logger_enable_timestamp(true); // 开启日志时间
 
-	pthread_t led_thread, led_test_thread;
-	int ret_led, led_test;
+	logger_set_level(LOG_LEVEL_INFO); // 设置日志等级
 
-	// 创建任务
-
-	// 创建LED任务线程
+	// 创建LED线程
+	pthread_t led_thread;
+	int ret_led;
 	ret_led = pthread_create(&led_thread, NULL, app_led_task, NULL);
 	if (ret_led != 0)
-		LOG_E("Failed to create LED thread: %s", strerror(ret_led));
+		LOG_E("Failed to create LED thread");
 
-	// 创建LED测试任务线程
-	led_test = pthread_create(&led_test_thread, NULL, test_led, NULL);
-	if (led_test != 0)
-		LOG_E("Failed to create LED thread: %s", strerror(led_test));
+	// 创建测试线程
+	pthread_t test_thread;
+	int ret_test;
+	ret_test = pthread_create(&test_thread, NULL, test, NULL);
 
-	// 运行所有线程
+	app_beep_init();			// 初始化蜂鸣器
+	app_fan_init();				// 初始化风扇
+	app_vibration_motor_init(); // 初始化振动马达
+
 	if (ret_led == 0)
-		pthread_join(led_thread, NULL);
+		pthread_join(led_thread, NULL); // 运行 LED 线程
 
-	if (led_test == 0)
-		pthread_join(led_test_thread, NULL);
+	if (ret_test == 0)
+		pthread_join(test_thread, NULL); // 测试线程
 
 	return 0;
 }
