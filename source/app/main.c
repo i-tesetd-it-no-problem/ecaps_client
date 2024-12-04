@@ -5,10 +5,12 @@
 #include <pthread.h>
 
 #include "utils/logger.h"
+
 #include "app/app_led.h"
 #include "app/app_beep.h"
 #include "app/app_fans.h"
 #include "app/app_vibration_motor.h"
+#include "app/app_vol_cur.h"
 
 enum test_cmd {
 	TEST_CMD_LED_NORMAL, // 0 正常闪烁
@@ -81,6 +83,13 @@ int main()
 	if (ret_led != 0)
 		LOG_E("Failed to create LED thread");
 
+	// 创建电压电流采集线程
+	pthread_t coll_v_i_thread;
+	int ret_v_i;
+	ret_v_i = pthread_create(&coll_v_i_thread, NULL, coll_v_i_task, NULL);
+	if (ret_v_i != 0)
+		LOG_E("Failed to create collect thread");
+
 	// 创建测试线程
 	pthread_t test_thread;
 	int ret_test;
@@ -91,10 +100,13 @@ int main()
 	app_vibration_motor_init(); // 初始化振动马达
 
 	if (ret_led == 0)
-		pthread_join(led_thread, NULL); // 运行 LED 线程
+		pthread_join(led_thread, NULL); // 等待LED线程
+
+	if (ret_v_i == 0)
+		pthread_join(coll_v_i_thread, NULL); // 等待LED线程
 
 	if (ret_test == 0)
-		pthread_join(test_thread, NULL); // 测试线程
+		pthread_join(test_thread, NULL); // 等待测试线程
 
 	return 0;
 }

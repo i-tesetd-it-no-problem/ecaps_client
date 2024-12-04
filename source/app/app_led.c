@@ -105,7 +105,6 @@ static void app_led_init(void)
 		return;
 	inited = true;
 
-	pthread_mutex_lock(&led_ctor.mutex);
 	// 打开所有LED
 	for (enum led_idx i = LED_IDX_1; i < LED_ID_MAX; i++) {
 		int fd = open(_led_dev[i].dev_path, O_WRONLY);
@@ -116,7 +115,6 @@ static void app_led_init(void)
 		}
 		_led_dev[i].fd = fd;
 	}
-	pthread_mutex_unlock(&led_ctor.mutex);
 
 	if (!err)
 		LOG_I("all led init success");
@@ -128,14 +126,12 @@ static void app_led_init(void)
 // 复位LED
 static void app_led_deinit(void)
 {
-	pthread_mutex_lock(&led_ctor.mutex);
 	for (enum led_idx i = LED_IDX_1; i < LED_ID_MAX; i++) {
 		if (_led_dev[i].fd >= 0) {
 			close(_led_dev[i].fd);
 			_led_dev[i].fd = -1;
 		}
 	}
-	pthread_mutex_unlock(&led_ctor.mutex);
 }
 
 // 周期闪烁
@@ -156,12 +152,10 @@ qstate app_led_normal(qfsm_t *me, qevent_t const *e)
 		for (enum led_idx i = LED_IDX_1; i < LED_ID_MAX; i++) {
 			if (_led_dev[i].fd < 0)
 				continue;
-			pthread_mutex_lock(&led_ctor.mutex);
 			ssize_t ret = write(_led_dev[i].fd, &_led_dev[i].level, 1); // 写入当前电平
 			if (ret != 1)
 				LOG_E("write to %s failed", _led_dev[i].dev_path);
 			_led_dev[i].level ^= 1; // 翻转
-			pthread_mutex_unlock(&led_ctor.mutex);
 		}
 		break;
 
@@ -187,8 +181,6 @@ qstate app_led_scroll(qfsm_t *me, qevent_t const *e)
 		req.tv_sec = 0;
 		req.tv_nsec = 50 * 1000000L; // 50 毫秒切换
 
-		pthread_mutex_lock(&led_ctor.mutex);
-
 		// 熄灭所有 LED
 		for (enum led_idx i = LED_IDX_1; i < LED_ID_MAX; i++) {
 			if (_led_dev[i].fd < 0)
@@ -204,8 +196,6 @@ qstate app_led_scroll(qfsm_t *me, qevent_t const *e)
 			if (write(_led_dev[current_led].fd, &on, 1) != 1)
 				LOG_E("Failed to turn on LED %s", _led_dev[current_led].dev_path);
 		}
-
-		pthread_mutex_unlock(&led_ctor.mutex);
 
 		// 下一个 LED
 		current_led = (current_led + 1) % LED_ID_MAX;
@@ -267,5 +257,10 @@ void led_chg_state(enum led_state state)
 
 	qevent_t ev = { .sig = CHANGE_SIG };
 	led_ctor.cur_state = state;
+
+	pthread_mutex_lock(&led_ctor.mutex);
+
 	qfsm_dispatch(&led_ctor.fsm, &ev);
+
+	pthread_mutex_unlock(&led_ctor.mutex);
 }

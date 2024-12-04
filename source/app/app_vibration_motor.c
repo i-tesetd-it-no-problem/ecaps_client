@@ -33,7 +33,7 @@
 #include <stdbool.h>
 #include <pthread.h>
 
-#define PWM_CHIP (12U)	 // PWM 号
+#define PWM_CHIP (8U)	 // PWM 号
 #define PWM_CHANNEL (0U) // PWM 通道 1
 #define CALC_STEP (10)	 // 步长 10
 
