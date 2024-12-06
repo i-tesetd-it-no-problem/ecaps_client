@@ -1,3 +1,32 @@
+/**
+ * @file app_vol_cur.c
+ * @author wenshuyu (wsy2161826815@163.com)
+ * @brief 扩展版工作电压电流采集
+ * @version 1.0
+ * @date 2024-12-04
+ * 
+ * @copyright Copyright (c) 2024
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ * 
+ */
+
 #include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -264,6 +293,7 @@ static void app_coll_i_v_deinit(void)
 }
 
 /**********************API**********************/
+#define COLL_PRIOD_MS (2000) // 2000ms
 
 // 采集电压和电流数据
 void *coll_v_i_task(void *arg)
@@ -273,20 +303,32 @@ void *coll_v_i_task(void *arg)
 		return NULL;
 	}
 
-	const size_t period_ms = 2000; // 50ms 周期
-
-	struct timespec req;
-	req.tv_sec = period_ms / 1000;
-	req.tv_nsec = (period_ms % 1000) * 1000000L; // 纳秒
+	struct timespec req_initial;
+	req_initial.tv_sec = COLL_PRIOD_MS / 1000;
+	req_initial.tv_nsec = (COLL_PRIOD_MS % 1000) * 1000000;
 
 	while (1) {
+		// 线程安全地检查运行标志
 		if (!instance.run_flag)
 			break;
 
 		if (collect_data(&instance) != 0)
 			LOG_E("Failed to collect data");
 
-		nanosleep(&req, NULL);
+		struct timespec req = req_initial;
+		struct timespec remain;
+
+		while (1) {
+			int ret = clock_nanosleep(CLOCK_MONOTONIC, 0, &req, &remain);
+			if (ret == 0)
+				break;
+			else if (ret == EINTR) {
+				req = remain;
+			} else {
+				LOG_E("clock_nanosleep failed: %s", strerror(ret));
+				break;
+			}
+		}
 	}
 
 	app_coll_i_v_deinit();

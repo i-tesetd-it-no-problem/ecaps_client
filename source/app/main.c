@@ -11,6 +11,8 @@
 #include "app/app_fans.h"
 #include "app/app_vibration_motor.h"
 #include "app/app_vol_cur.h"
+#include "app/app_digital.h"
+#include "app/app_si7006.h"
 
 enum test_cmd {
 	TEST_CMD_LED_NORMAL, // 0 正常闪烁
@@ -81,14 +83,28 @@ int main()
 	int ret_led;
 	ret_led = pthread_create(&led_thread, NULL, app_led_task, NULL);
 	if (ret_led != 0)
-		LOG_E("Failed to create LED thread");
+		LOG_E("Failed to create thread");
 
 	// 创建电压电流采集线程
 	pthread_t coll_v_i_thread;
 	int ret_v_i;
 	ret_v_i = pthread_create(&coll_v_i_thread, NULL, coll_v_i_task, NULL);
 	if (ret_v_i != 0)
-		LOG_E("Failed to create collect thread");
+		LOG_E("Failed to create thread");
+
+	// 创建数码管线程
+	pthread_t digtal_thread;
+	int ret_digtal;
+	ret_digtal = pthread_create(&digtal_thread, NULL, app_digital_task, NULL);
+	if (ret_digtal != 0)
+		LOG_E("Failed to create thread");
+
+	// 创建采集温湿度线程
+	pthread_t humi_temp_thread;
+	int ret_humi_temp;
+	ret_humi_temp = pthread_create(&humi_temp_thread, NULL, app_si7006_task, NULL);
+	if (ret_humi_temp != 0)
+		LOG_E("Failed to create thread");
 
 	// 创建测试线程
 	pthread_t test_thread;
@@ -104,6 +120,12 @@ int main()
 
 	if (ret_v_i == 0)
 		pthread_join(coll_v_i_thread, NULL); // 等待LED线程
+
+	if (ret_digtal == 0)
+		pthread_join(digtal_thread, NULL); // 等待数码管线程
+
+	if (ret_humi_temp == 0)
+		pthread_join(humi_temp_thread, NULL); // 等待温湿度采集线程
 
 	if (ret_test == 0)
 		pthread_join(test_thread, NULL); // 等待测试线程

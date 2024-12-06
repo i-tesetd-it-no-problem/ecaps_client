@@ -1,9 +1,9 @@
 /**
- * @file app_vol_cur.h
+ * @file app_si7006.h
  * @author wenshuyu (wsy2161826815@163.com)
- * @brief 扩展版工作电压电流采集
+ * @brief 温湿度采集
  * @version 1.0
- * @date 2024-12-04
+ * @date 2024-12-06
  * 
  * @copyright Copyright (c) 2024
  * 
@@ -27,19 +27,37 @@
  * 
  */
 
-#ifndef _APP_VOL_CUR_H
-#define _APP_VOL_CUR_H
+#ifndef _APP_SI7006_H
+#define _APP_SI7006_H
 
-// 采集电压和电流任务
-void *coll_v_i_task(void *arg);
+#include <stdint.h>
 
-// 获取电压
-float get_voltage(void);
+/**
+ * @brief 采集温湿度任务
+ * 
+ * @param arg 线程参数
+ * @return void* 返回 NULL
+ */
+void *app_si7006_task(void *arg);
 
-// 获取电流
-float get_current(void);
+/**
+ * @brief 停止采集任务
+ * 
+ */
+void app_si7006_task_stop(void);
 
-// 停止数据采集
-void stop_coll_task(void);
+/**
+ * @brief 获取湿度
+ * 
+ * @return float 
+ */
+float get_humidity(void);
 
-#endif /* _APP_VOL_CUR_H */
+/**
+ * @brief 获取温度
+ * 
+ * @return float 
+ */
+float get_temperature(void);
+
+#endif /* _APP_SI7006_H */

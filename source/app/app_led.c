@@ -37,6 +37,7 @@
 #include <string.h>
 
 #include "app/app_led.h"
+
 #include "utils/logger.h"
 #include "utils/qfsm.h"
 
@@ -80,12 +81,14 @@ struct led_task {
 	pthread_mutex_t mutex;	  // 互斥锁
 	bool running;			  // 运行标志
 	enum led_state cur_state; // 当前状态
+	size_t period_ms;		  // 当前状态的周期
 };
 
 static struct led_task led_ctor = {
 	.cur_state = LED_STATE_NORMAL,
 	.running = true,
 	.mutex = PTHREAD_MUTEX_INITIALIZER,
+	.period_ms = 30,
 };
 
 static qstate app_led_normal(qfsm_t *me, qevent_t const *ev); // 周期闪烁状态
@@ -95,6 +98,11 @@ static qstate app_led_scroll(qfsm_t *me, qevent_t const *ev); // 跑马灯状态
 static qstate_handler _all_state[LED_STATE_NONE] = {
 	[LED_STATE_NORMAL] = app_led_normal,
 	[LED_STATE_SCROL] = app_led_scroll,
+};
+
+static size_t _stata_period[LED_STATE_NONE] = {
+	[LED_STATE_NORMAL] = 50,
+	[LED_STATE_SCROL] = 25,
 };
 
 static void app_led_init(void)
@@ -138,17 +146,9 @@ static void app_led_deinit(void)
 qstate app_led_normal(qfsm_t *me, qevent_t const *e)
 {
 	struct led_task *p = (struct led_task *)me;
-	struct timespec req;
-	uint32_t period = 200; // 200ms
 
 	switch (e->sig) {
 	case Q_APP_EVENT_TIMEOUT:
-
-		req.tv_sec = period / 1000;
-		req.tv_nsec = (period % 1000) * 1000000L;
-
-		nanosleep(&req, NULL); // 休眠
-
 		for (enum led_idx i = LED_IDX_1; i < LED_ID_MAX; i++) {
 			if (_led_dev[i].fd < 0)
 				continue;
@@ -173,14 +173,10 @@ qstate app_led_normal(qfsm_t *me, qevent_t const *e)
 qstate app_led_scroll(qfsm_t *me, qevent_t const *e)
 {
 	struct led_task *p = (struct led_task *)me;
-	static enum led_idx current_led = LED_IDX_1; //
-	struct timespec req;
+	static enum led_idx current_led = LED_IDX_1;
 
 	switch (e->sig) {
 	case Q_APP_EVENT_TIMEOUT:
-		req.tv_sec = 0;
-		req.tv_nsec = 50 * 1000000L; // 50 毫秒切换
-
 		// 熄灭所有 LED
 		for (enum led_idx i = LED_IDX_1; i < LED_ID_MAX; i++) {
 			if (_led_dev[i].fd < 0)
@@ -200,8 +196,6 @@ qstate app_led_scroll(qfsm_t *me, qevent_t const *e)
 		// 下一个 LED
 		current_led = (current_led + 1) % LED_ID_MAX;
 
-		// 休眠
-		nanosleep(&req, NULL);
 		break;
 
 	case CHANGE_SIG:
@@ -222,17 +216,27 @@ qstate app_led_scroll(qfsm_t *me, qevent_t const *e)
  * @param arg 线程参数
  * @return void* 返回 NULL
  */
+
 void *app_led_task(void *arg)
 {
 	app_led_init();
 
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+
 	while (led_ctor.running) {
 		qevent_t ev = { .sig = Q_APP_EVENT_TIMEOUT };
 		qfsm_dispatch(&led_ctor.fsm, &ev);
+
+		ts.tv_nsec += led_ctor.period_ms * 1000000;
+		while (ts.tv_nsec >= 1000000000) {
+			ts.tv_nsec -= 1000000000;
+			ts.tv_sec++;
+		}
+		clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &ts, NULL);
 	}
 
 	app_led_deinit();
-
 	return NULL;
 }
 
@@ -256,7 +260,9 @@ void led_chg_state(enum led_state state)
 		return;
 
 	qevent_t ev = { .sig = CHANGE_SIG };
+
 	led_ctor.cur_state = state;
+	led_ctor.period_ms = _stata_period[state];
 
 	pthread_mutex_lock(&led_ctor.mutex);
 
