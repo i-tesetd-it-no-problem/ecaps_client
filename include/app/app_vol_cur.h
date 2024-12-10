@@ -30,16 +30,23 @@
 #ifndef _APP_VOL_CUR_H
 #define _APP_VOL_CUR_H
 
-// 采集电压和电流任务
-void *coll_v_i_task(void *arg);
+#include <stdbool.h>
+
+#define APP_COLL_I_V_PERIOD (500U)
+
+// 初始化电压电流采集模块
+bool app_coll_i_v_init(void);
+
+// 关闭电压电流采集模块
+void app_coll_i_v_deinit(void);
+
+// 采集电压和电流数据
+void collect_data(void);
 
 // 获取电压
 float get_voltage(void);
 
 // 获取电流
 float get_current(void);
-
-// 停止数据采集
-void stop_coll_task(void);
 
 #endif /* _APP_VOL_CUR_H */

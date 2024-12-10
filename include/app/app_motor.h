@@ -1,5 +1,5 @@
 /**
- * @file app_vibration_motor.h
+ * @file app_motor.h
  * @author wenshuyu (wsy2161826815@163.com)
  * @brief 振动马达
  * @version 1.0
@@ -27,8 +27,8 @@
  * 
  */
 
-#ifndef _APP_VIBRATION_MOTOR_
-#define _APP_VIBRATION_MOTOR_
+#ifndef _APP_MOTOR_
+#define _APP_MOTOR_
 
 #include <stdbool.h>
 
@@ -38,7 +38,7 @@
  * @return true 
  * @return false 
  */
-bool app_vibration_motor_init(void);
+bool app_motor_init(void);
 
 /**
  * @brief 开启/关闭震动马达
@@ -48,27 +48,27 @@ bool app_vibration_motor_init(void);
 void vibration_motor_control(bool enable);
 
 /**
- * @brief 提升震动强度（增加占空比）
+ * @brief 提升震动强度(增加占空比)
  * 
  */
-void app_vibration_motor_stronger(void);
+void app_motor_stronger(void);
 
 /**
- * @brief 降低震动强度（减少占空比）
+ * @brief 降低震动强度(减少占空比)
  * 
  */
-void app_vibration_motor_weaker(void);
+void app_motor_weaker(void);
 
 /**
- * @brief 提升震动频率（增加振动速度）
+ * @brief 提升震动频率(增加振动速度)
  * 
  */
-void app_vibration_motor_faster(void);
+void app_motor_faster(void);
 
 /**
- * @brief 降低震动频率（减慢振动速度）
+ * @brief 降低震动频率(减慢振动速度)
  * 
  */
-void app_vibration_motor_slower(void);
+void app_motor_slower(void);
 
-#endif /* _APP_VIBRATION_MOTOR_ */
+#endif /* _APP_MOTOR_ */

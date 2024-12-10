@@ -16,15 +16,13 @@
 struct digital_device {
 	int fd;
 	pthread_mutex_t mutex;
-	bool run_flag;
 	uint16_t show_value;
 };
 
 static struct digital_device dig_dev = {
 	.fd = -1,
 	.mutex = PTHREAD_MUTEX_INITIALIZER,
-	.run_flag = true,
-	.show_value = 0x1234,
+	.show_value = 0,
 };
 
 // 0 - 9 A - F
@@ -42,7 +40,7 @@ static uint8_t digita_map[] = {
 	0x77, // A
 	0x7C, // b
 	0x39, // C
-	0x5E, // d
+	0x5E, // D
 	0x79, // E
 	0x71, // F
 };
@@ -59,7 +57,9 @@ static bool get_trans_data(uint16_t show_value, uint8_t *buf, uint8_t len)
 		return false;
 	}
 
+	pthread_mutex_lock(&dig_dev.mutex);
 	uint16_t current_value = dig_dev.show_value;
+	pthread_mutex_unlock(&dig_dev.mutex);
 
 	for (int j = 0; j < 4; j++) {
 		uint8_t tmp = (current_value >> (12 - 4 * j)) & 0x0F;
@@ -70,31 +70,40 @@ static bool get_trans_data(uint16_t show_value, uint8_t *buf, uint8_t len)
 	return true;
 }
 
-static void app_digital_init(void)
+bool app_digital_init(void)
 {
-	static bool inited = false;
-	if (inited)
-		return;
-	inited = true;
-
 	dig_dev.fd = open(DEV_PATH, O_WRONLY);
-	if (dig_dev.fd < 0) {
-		LOG_E("Failed to open device: %s", DEV_PATH);
-	}
+	if (dig_dev.fd < 0)
+		return false;
+	else
+		return true;
 }
 
-static void app_digital_deinit(void)
+void app_digital_deinit(void)
 {
 	if (dig_dev.fd >= 0) {
 		close(dig_dev.fd);
 		dig_dev.fd = -1;
+		LOG_I("Digital device closed.");
 	}
 }
 
-static void write_show_value(void)
+static void digital_test(void)
+{
+	static size_t counter = 0;
+	counter += APP_DIGITAL_TASK_PERIOD;
+	if (counter >= 1000) {
+		counter = 0;
+		dig_dev.show_value++;
+	}
+}
+
+void app_digital_task(void)
 {
 	if (dig_dev.fd < 0)
 		return;
+
+	digital_test();
 
 	uint8_t buf[DIGITAL_BYTES] = { 0 };
 	bool ret = get_trans_data(dig_dev.show_value, buf, sizeof(buf));
@@ -102,53 +111,14 @@ static void write_show_value(void)
 		return;
 
 	for (int i = 0; i < 4; i++) {
-		int num = write(dig_dev.fd, buf + i * 2, 2);
+		ssize_t num = write(dig_dev.fd, buf + i * 2, 2);
 		if (num != 2) {
-			LOG_E("Write data failed, num is %d", num);
+			LOG_E("Write data failed, num is %zd", num);
 			close(dig_dev.fd);
 			dig_dev.fd = -1;
+			return;
 		}
 	}
-}
-
-static void test(size_t ms)
-{
-	static size_t count = 0;
-	count += ms;
-
-	// 每秒递增一次
-	if (count >= 1000) {
-		dig_dev.show_value++;
-		count = 0;
-	}
-}
-
-/***********************API***********************/
-
-// 周期1ms
-#define PERIOD_MS (1)
-
-void *app_digital_task(void *arg)
-{
-	app_digital_init();
-
-	struct timespec ts;
-	clock_gettime(CLOCK_MONOTONIC, &ts);
-
-	while (dig_dev.run_flag) {
-		write_show_value();
-		test(PERIOD_MS); // 测试代码
-
-		ts.tv_nsec += PERIOD_MS * 1000000;
-		while (ts.tv_nsec >= 1000000000) {
-			ts.tv_nsec -= 1000000000;
-			ts.tv_sec++;
-		}
-		clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &ts, NULL);
-	}
-
-	app_digital_deinit();
-	return NULL;
 }
 
 void app_change_digital(uint16_t value)
@@ -158,7 +128,11 @@ void app_change_digital(uint16_t value)
 	pthread_mutex_unlock(&dig_dev.mutex);
 }
 
-void app_digital_stop(void)
+uint16_t app_get_digital_value(void)
 {
-	dig_dev.run_flag = false;
+	uint16_t value;
+	pthread_mutex_lock(&dig_dev.mutex);
+	value = dig_dev.show_value;
+	pthread_mutex_unlock(&dig_dev.mutex);
+	return value;
 }

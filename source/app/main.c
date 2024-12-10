@@ -1,134 +1,132 @@
-#include <stdint.h>
-#include <stdio.h>
-#include <sys/timerfd.h>
-#include <unistd.h>
-#include <pthread.h>
+#include <signal.h>
 
+#include "utils/epoll_timer.h"
 #include "utils/logger.h"
 
-#include "app/app_led.h"
-#include "app/app_beep.h"
-#include "app/app_fans.h"
-#include "app/app_vibration_motor.h"
-#include "app/app_vol_cur.h"
-#include "app/app_digital.h"
-#include "app/app_si7006.h"
+#include "app/main.h"
 
-enum test_cmd {
-	TEST_CMD_LED_NORMAL, // 0 正常闪烁
-	TEST_CMD_LED_SCROLL, // 1 跑马灯
-	TEST_CMD_BEEP_ON,	 // 2 开启蜂鸣器
-	TEST_CMD_BEEP_OFF,	 // 3 关闭蜂鸣器
-	TEST_CMD_FANS_ON,	 // 4 开启风扇
-	TEST_CMD_FANS_OFF,	 // 5 关闭风扇
-	TEST_CMD_MOTOR_ON,	 // 6 开启马达
-	TEST_CMD_MOTOR_OFF,	 // 7 关闭马达
-
-	TEST_CMD_LED_MAX,
+// LED 任务
+static struct epoll_timer_task led_task = {
+	.f_init = app_led_init,
+	.f_entry = app_led_process,
+	.f_deinit = app_led_deinit,
+	.period_ms = APP_LED_TASK_PERIOD_MS,
 };
 
-void *test(void *arg)
-{
-	while (1) {
-		int state;
-		LOG_I("input state");
-		if (scanf("%d", &state) != 1) {
-			LOG_E("Invalid input. Please enter an integer.");
-			while (getchar() != '\n')
-				; // 清空输入缓冲区
-			continue;
-		}
+// 采集温湿度任务
+static struct epoll_timer_task si7006_task = {
+	.f_init = app_si7006_init,
+	.f_entry = app_si7006_collect,
+	.f_deinit = app_si7006_deinit,
+	.period_ms = APP_SI7006_TASK_PERIOD,
+};
 
-		switch (state) {
-		case TEST_CMD_LED_NORMAL:
-			led_chg_state(LED_STATE_NORMAL);
-			break;
-		case TEST_CMD_LED_SCROLL:
-			led_chg_state(LED_STATE_SCROL);
-			break;
-		case TEST_CMD_BEEP_ON:
-			beep_control(true);
-			break;
-		case TEST_CMD_BEEP_OFF:
-			beep_control(false);
-			break;
-		case TEST_CMD_FANS_ON:
-			fans_control(true);
-			break;
-		case TEST_CMD_FANS_OFF:
-			fans_control(false);
-			break;
-		case TEST_CMD_MOTOR_ON:
-			vibration_motor_control(true);
-			break;
-		case TEST_CMD_MOTOR_OFF:
-			vibration_motor_control(false);
-			break;
-		default:
-			break;
-		}
-	}
+// 采集工作电压/电流任务
+struct epoll_timer_task coll_i_v_task = {
+	.f_init = app_coll_i_v_init,
+	.f_entry = collect_data,
+	.f_deinit = app_coll_i_v_deinit,
+	.period_ms = APP_COLL_I_V_PERIOD,
+};
+
+// 数码管任务
+struct epoll_timer_task digital_task = {
+	.f_init = app_digital_init,
+	.f_entry = app_digital_task,
+	.f_deinit = app_digital_deinit,
+	.period_ms = APP_DIGITAL_TASK_PERIOD,
+};
+
+// 蜂鸣器任务
+struct epoll_timer_task beep_task = {
+	.f_init = app_beep_init,
+	.f_entry = NULL,
+	.f_deinit = NULL,
+	.period_ms = 0,
+};
+
+// 小风扇任务
+struct epoll_timer_task fan_task = {
+	.f_init = app_fan_init,
+	.f_entry = NULL,
+	.f_deinit = NULL,
+	.period_ms = 0,
+};
+
+// 马达任务
+struct epoll_timer_task motor_task = {
+	.f_init = app_motor_init,
+	.f_entry = NULL,
+	.f_deinit = NULL,
+	.period_ms = 0,
+};
+
+// 红外/光强/接近 任务
+struct epoll_timer_task ap3216c_task = {
+	.f_init = app_ap3216c_init,
+	.f_entry = app_ap3216c_collect,
+	.f_deinit = app_ap3216c_deinit,
+	.period_ms = APP_AP3216C_TASK_PEIOD,
+};
+
+// 心率血氧 任务
+struct epoll_timer_task max30102_task = {
+	.f_init = app_max30102_init,
+	.f_entry = app_max30102_task,
+	.f_deinit = app_max30102_deinit,
+	.period_ms = APP_MAX30102_TASK_PERIOD,
+};
+
+// 服务端上传任务
+struct epoll_timer_task upload_task = {
+	.f_init = app_upload_init,
+	.f_entry = app_upload_task,
+	.f_deinit = app_upload_deinit,
+	.period_ms = APP_UPLOAD_TASK_PERIOD,
+};
+
+static volatile et_handle ept = NULL;
+
+static void sigint_handler(int signum)
+{
+	if (ept)
+		epoll_timer_stop(ept);
 }
 
-/********************主任务********************/
-
-int main()
+int main(void)
 {
-	logger_enable_timestamp(true); // 开启日志时间
+	ept = epoll_timer_create();
+	if (!ept) {
+		LOG_E("Failed to create epoll timer.");
+		return -1;
+	}
 
-	logger_set_level(LOG_LEVEL_INFO); // 设置日志等级
+	// Kill信号清理资源
+	struct sigaction sa;
+	sa.sa_handler = sigint_handler;
+	sa.sa_flags = 0;
+	sigemptyset(&sa.sa_mask);
+	sigaction(SIGINT, &sa, NULL);
 
-	// 创建LED线程
-	pthread_t led_thread;
-	int ret_led;
-	ret_led = pthread_create(&led_thread, NULL, app_led_task, NULL);
-	if (ret_led != 0)
-		LOG_E("Failed to create thread");
+#ifdef BOARD_ENV
+	epoll_timer_add_task(ept, &led_task);
+	epoll_timer_add_task(ept, &si7006_task);
+	epoll_timer_add_task(ept, &coll_i_v_task);
+	epoll_timer_add_task(ept, &digital_task);
+	epoll_timer_add_task(ept, &beep_task);
+	epoll_timer_add_task(ept, &fan_task);
+	epoll_timer_add_task(ept, &motor_task);
+	epoll_timer_add_task(ept, &ap3216c_task);
+	epoll_timer_add_task(ept, &max30102_task);
+#else
+	epoll_timer_add_task(ept, &upload_task);
+#endif
 
-	// 创建电压电流采集线程
-	pthread_t coll_v_i_thread;
-	int ret_v_i;
-	ret_v_i = pthread_create(&coll_v_i_thread, NULL, coll_v_i_task, NULL);
-	if (ret_v_i != 0)
-		LOG_E("Failed to create thread");
+	if (epoll_timer_run(ept) < 0)
+		LOG_E("Timer run loop exited with error.");
 
-	// 创建数码管线程
-	pthread_t digtal_thread;
-	int ret_digtal;
-	ret_digtal = pthread_create(&digtal_thread, NULL, app_digital_task, NULL);
-	if (ret_digtal != 0)
-		LOG_E("Failed to create thread");
-
-	// 创建采集温湿度线程
-	pthread_t humi_temp_thread;
-	int ret_humi_temp;
-	ret_humi_temp = pthread_create(&humi_temp_thread, NULL, app_si7006_task, NULL);
-	if (ret_humi_temp != 0)
-		LOG_E("Failed to create thread");
-
-	// 创建测试线程
-	pthread_t test_thread;
-	int ret_test;
-	ret_test = pthread_create(&test_thread, NULL, test, NULL);
-
-	app_beep_init();			// 初始化蜂鸣器
-	app_fan_init();				// 初始化风扇
-	app_vibration_motor_init(); // 初始化振动马达
-
-	if (ret_led == 0)
-		pthread_join(led_thread, NULL); // 等待LED线程
-
-	if (ret_v_i == 0)
-		pthread_join(coll_v_i_thread, NULL); // 等待LED线程
-
-	if (ret_digtal == 0)
-		pthread_join(digtal_thread, NULL); // 等待数码管线程
-
-	if (ret_humi_temp == 0)
-		pthread_join(humi_temp_thread, NULL); // 等待温湿度采集线程
-
-	if (ret_test == 0)
-		pthread_join(test_thread, NULL); // 等待测试线程
+	epoll_timer_destroy(ept);
+	ept = NULL;
 
 	return 0;
 }

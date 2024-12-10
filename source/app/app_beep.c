@@ -38,8 +38,8 @@
 #define CALC_STEP (10)	 // 步长 10
 
 struct app_beep {
-	size_t period;		   // 周期（控制音调）
-	size_t duty_cycle;	   // 占空比（控制强度）
+	size_t period;		   // 周期(控制音调)
+	size_t duty_cycle;	   // 占空比(控制强度)
 	pthread_mutex_t mutex; // 互斥锁
 	bool inited;		   // 初始化标志
 };
@@ -75,8 +75,8 @@ bool app_beep_init(void)
 
 	pthread_mutex_lock(&beep.mutex);
 
-	set_pwm_period(PWM_CHIP, PWM_CHANNEL, beep.period);			// 设置周期（音调）
-	set_pwm_duty_cycle(PWM_CHIP, PWM_CHANNEL, beep.duty_cycle); // 设置占空比（强度）
+	set_pwm_period(PWM_CHIP, PWM_CHANNEL, beep.period);			// 设置周期(音调)
+	set_pwm_duty_cycle(PWM_CHIP, PWM_CHANNEL, beep.duty_cycle); // 设置占空比(强度)
 
 	pthread_mutex_unlock(&beep.mutex);
 
@@ -103,7 +103,7 @@ void beep_control(bool enable)
 }
 
 /**
- * @brief 提升音量（增加响度）
+ * @brief 提升音量(增加响度)
  * 
  */
 void app_beep_higher(void)
@@ -120,7 +120,7 @@ void app_beep_higher(void)
 }
 
 /**
- * @brief 降低音量（减小响度）
+ * @brief 降低音量(减小响度)
  * 
  */
 void app_beep_lower(void)
@@ -137,7 +137,7 @@ void app_beep_lower(void)
 }
 
 /**
- * @brief 提升音调（增加频率）
+ * @brief 提升音调(增加频率)
  * 
  */
 void app_beep_higher_tone(void)
@@ -154,7 +154,7 @@ void app_beep_higher_tone(void)
 }
 
 /**
- * @brief 降低音调（降低频率）
+ * @brief 降低音调(降低频率)
  * 
  */
 void app_beep_lower_tone(void)

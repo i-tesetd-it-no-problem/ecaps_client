@@ -160,10 +160,10 @@ void logger_log(enum log_level level, const char *file, int line, const char *fm
 
     char final_log[LOG_FINAL_MAX_SIZE];
     if (g_logger.timestamp_enabled) {
-        snprintf(final_log, sizeof(final_log), "[%s] [%-5s] [TID:%-5d] [%-10s:%-4d] %s\n",
+        snprintf(final_log, sizeof(final_log), "[%s] [%-5s] [TID:%-3d] [%-20s:%-4d] %s\n",
                  time_str, level_to_string(level), thread_id, file, line, message_buffer);
     } else {
-        snprintf(final_log, sizeof(final_log), "[%-5s] [TID:%-5d] [%-10s:%-4d] %s\n",
+        snprintf(final_log, sizeof(final_log), "[%-5s] [TID:%-3d] [%-20s:%-4d] %s\n",
                  level_to_string(level), thread_id, file, line, message_buffer);
     }
 

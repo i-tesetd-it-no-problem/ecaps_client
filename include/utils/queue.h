@@ -37,8 +37,8 @@
 
 struct queue_info {
     uint8_t *buf;          /* 缓冲区 */
-    size_t unit_bytes;     /* 单元大小（字节数） */
-    size_t buf_size;       /* 缓冲区容量（单位数） */
+    size_t unit_bytes;     /* 单元大小(字节数) */
+    size_t buf_size;       /* 缓冲区容量(单位数) */
     size_t rd;             /* 读索引 */
     size_t wr;             /* 写索引 */
     pthread_mutex_t mutex; /* 互斥锁，用于线程安全 */
@@ -47,10 +47,10 @@ struct queue_info {
 /**
  * @brief 初始化队列
  * 
- * @param q          指向队列实例的指针（由用户分配内存）
+ * @param q          指向队列实例的指针(由用户分配内存)
  * @param unit_bytes 每个单元的字节数
  * @param buf        指向预分配缓冲区的指针
- * @param count      缓冲区容量（单位数）
+ * @param count      缓冲区容量(单位数)
  * @return true 成功，false 失败
  */
 bool queue_init(struct queue_info *q, size_t unit_bytes, uint8_t *buf, size_t count);

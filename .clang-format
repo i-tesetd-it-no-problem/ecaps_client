@@ -80,10 +80,10 @@ IndentWrappedFunctionNames: false
 # 保留的空行数
 MaxEmptyLinesToKeep: 1
 
-# 命名空间缩进（对 C 无影响，但设置为 None）
+# 命名空间缩进(对 C 无影响，但设置为 None)
 NamespaceIndentation: None
 
-# 访问修饰符缩进（对 C 无影响，但设置为 -8）
+# 访问修饰符缩进(对 C 无影响，但设置为 -8)
 AccessModifierOffset: -8
 
 # 参数和声明换行设置
@@ -96,5 +96,5 @@ AllowShortLoopsOnASingleLine: false
 # 返回类型换行
 AlwaysBreakAfterReturnType: None
 
-# C++11 花括号列表（对 C 无影响，但设置为 false）
+# C++11 花括号列表(对 C 无影响，但设置为 false)
 Cpp11BracedListStyle: false

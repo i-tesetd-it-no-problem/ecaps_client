@@ -656,7 +656,7 @@ int ssl_client_connect(ssl_handle client, const char *url)
 		return -1;
 	}
 
-	// 设置服务器主机名（用于SNI和证书验证）
+	// 设置服务器主机名(用于SNI和证书验证)
 	ret = mbedtls_ssl_set_hostname(&client->ssl, url_info->host);
 	if (ret != 0) {
 		mbedtls_strerror(ret, err_buf, MBEDTLS_ERR_BUF_SIZE);

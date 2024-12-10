@@ -48,25 +48,25 @@ bool app_fan_init(void);
 void fans_control(bool enable);
 
 /**
- * @brief 提升风扇风速（增加频率）
+ * @brief 提升风扇风速(增加频率)
  * 
  */
 void app_fans_faster(void);
 
 /**
- * @brief 降低风扇风速（降低频率）
+ * @brief 降低风扇风速(降低频率)
  * 
  */
 void app_fans_slower(void);
 
 /**
- * @brief 提升风扇强度（增加占空比）
+ * @brief 提升风扇强度(增加占空比)
  * 
  */
 void app_fans_stronger(void);
 
 /**
- * @brief 降低风扇强度（减少占空比）
+ * @brief 降低风扇强度(减少占空比)
  * 
  */
 void app_fans_weaker(void);

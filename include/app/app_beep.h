@@ -48,25 +48,25 @@ bool app_beep_init(void);
 void beep_control(bool enable);
 
 /**
- * @brief 提升音量（增加响度）
+ * @brief 提升音量(增加响度)
  * 
  */
 void app_beep_higher(void);
 
 /**
- * @brief 降低音量（减小响度）
+ * @brief 降低音量(减小响度)
  * 
  */
 void app_beep_lower(void);
 
 /**
- * @brief 提升音调（增加频率）
+ * @brief 提升音调(增加频率)
  * 
  */
 void app_beep_higher_tone(void);
 
 /**
- * @brief 降低音调（降低频率）
+ * @brief 降低音调(降低频率)
  * 
  */
 void app_beep_lower_tone(void);

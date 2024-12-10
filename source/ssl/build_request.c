@@ -215,7 +215,7 @@ int build_post_request(const char* url, const char* content_type, const char* bo
     }
     offset += n;
 
-    // 添加请求体（如果存在）
+    // 添加请求体(如果存在)
     if (body && body_length > 0) {
         if (body_length >= buffer_size - offset) {
             LOG_E("Buffer overflow detected at body\n");

@@ -31,14 +31,14 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <time.h>
 #include <unistd.h>
 #include <stdlib.h>
-#include <pthread.h>
 #include <stdbool.h>
 #include <errno.h>
+#include <pthread.h>
 
 #include "app/app_vol_cur.h"
+#include "json/sensor_json.h"
 #include "utils/logger.h"
 
 #define R50 (1000.0)
@@ -46,7 +46,7 @@
 #define R53 (10.0)
 #define R54 (0.1)
 
-#define IIO_DEVICE (2)
+#define IIO_DEVICE (3)
 #define VOLTAGE_CHANNEL (18)
 #define CURRENT_CHANNEL (19)
 
@@ -71,11 +71,10 @@ struct coll_task {
 
 // 初始化结构体实例
 static struct coll_task instance = {
-	.current = 0.0f,
 	.voltage = 0.0f,
+	.current = 0.0f,
 	.lock = PTHREAD_RWLOCK_INITIALIZER,
 	.run_flag = true,
-
 	.fd_raw_v = -1,
 	.fd_raw_i = -1,
 	.fd_scale = -1,
@@ -154,6 +153,8 @@ static int collect_voltage(struct coll_task *inst)
 		return -1;
 	}
 
+	get_sensor_data()->lmv358.voltage = inst->voltage;
+
 	LOG_I("voltage is %.2fmV", inst->voltage);
 
 	return 0;
@@ -203,29 +204,14 @@ static int collect_current(struct coll_task *inst)
 		return -1;
 	}
 
+	get_sensor_data()->lmv358.current = inst->current;
+
 	LOG_I("current is %.2fmA", inst->current);
 
 	return 0;
 }
 
-// 采集电压和电流
-static int collect_data(struct coll_task *inst)
-{
-	if (collect_voltage(inst) != 0) {
-		LOG_E("Failed to collect voltage data");
-		return -1;
-	}
-
-	if (collect_current(inst) != 0) {
-		LOG_E("Failed to collect current data");
-		return -1;
-	}
-
-	return 0;
-}
-
-// 初始化文件描述符
-static int app_coll_i_v_init(void)
+bool app_coll_i_v_init(void)
 {
 	int ret;
 	char path_buf[64];
@@ -236,7 +222,7 @@ static int app_coll_i_v_init(void)
 	instance.fd_raw_v = open(path_buf, O_RDONLY);
 	if (instance.fd_raw_v < 0) {
 		LOG_E("Failed to open raw voltage file: %s, error: %s", path_buf, strerror(errno));
-		goto error;
+		return false;
 	}
 
 	// 打开 raw current 文件
@@ -245,7 +231,8 @@ static int app_coll_i_v_init(void)
 	instance.fd_raw_i = open(path_buf, O_RDONLY);
 	if (instance.fd_raw_i < 0) {
 		LOG_E("Failed to open raw current file: %s, error: %s", path_buf, strerror(errno));
-		goto error;
+		close(instance.fd_raw_v);
+		return false;
 	}
 
 	// 打开 scale 文件
@@ -254,29 +241,16 @@ static int app_coll_i_v_init(void)
 	instance.fd_scale = open(path_buf, O_RDONLY);
 	if (instance.fd_scale < 0) {
 		LOG_E("Failed to open scale file: %s, error: %s", path_buf, strerror(errno));
-		goto error;
-	}
-
-	return 0;
-
-error:
-	if (instance.fd_raw_v >= 0) {
 		close(instance.fd_raw_v);
-		instance.fd_raw_v = -1;
-	}
-	if (instance.fd_raw_i >= 0) {
 		close(instance.fd_raw_i);
-		instance.fd_raw_i = -1;
+		return false;
 	}
-	if (instance.fd_scale >= 0) {
-		close(instance.fd_scale);
-		instance.fd_scale = -1;
-	}
-	return -1;
+
+	return true;
 }
 
 // 关闭文件描述符
-static void app_coll_i_v_deinit(void)
+void app_coll_i_v_deinit(void)
 {
 	if (instance.fd_scale >= 0) {
 		close(instance.fd_scale);
@@ -292,47 +266,11 @@ static void app_coll_i_v_deinit(void)
 	}
 }
 
-/**********************API**********************/
-#define COLL_PRIOD_MS (2000) // 2000ms
-
-// 采集电压和电流数据
-void *coll_v_i_task(void *arg)
+// 采集电压和电流
+void collect_data(void)
 {
-	if (app_coll_i_v_init() != 0) {
-		LOG_E("Failed to initialize voltage and current collection");
-		return NULL;
-	}
-
-	struct timespec req_initial;
-	req_initial.tv_sec = COLL_PRIOD_MS / 1000;
-	req_initial.tv_nsec = (COLL_PRIOD_MS % 1000) * 1000000;
-
-	while (1) {
-		// 线程安全地检查运行标志
-		if (!instance.run_flag)
-			break;
-
-		if (collect_data(&instance) != 0)
-			LOG_E("Failed to collect data");
-
-		struct timespec req = req_initial;
-		struct timespec remain;
-
-		while (1) {
-			int ret = clock_nanosleep(CLOCK_MONOTONIC, 0, &req, &remain);
-			if (ret == 0)
-				break;
-			else if (ret == EINTR) {
-				req = remain;
-			} else {
-				LOG_E("clock_nanosleep failed: %s", strerror(ret));
-				break;
-			}
-		}
-	}
-
-	app_coll_i_v_deinit();
-	return NULL;
+	collect_voltage(&instance);
+	collect_current(&instance);
 }
 
 // 获取电压
@@ -359,12 +297,4 @@ float get_current(void)
 	current = instance.current;
 	pthread_rwlock_unlock(&instance.lock);
 	return current;
-}
-
-// 停止数据采集
-void stop_coll_task(void)
-{
-	pthread_rwlock_wrlock(&instance.lock);
-	instance.run_flag = false;
-	pthread_rwlock_unlock(&instance.lock);
 }

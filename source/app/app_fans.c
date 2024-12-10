@@ -38,8 +38,8 @@
 #define CALC_STEP (10)	 // 步长 10
 
 struct app_fans {
-	size_t period;		   // 周期（控制风速）
-	size_t duty_cycle;	   // 占空比（控制强度）
+	size_t period;		   // 周期(控制风速)
+	size_t duty_cycle;	   // 占空比(控制强度)
 	pthread_mutex_t mutex; // 互斥锁
 	bool inited;		   // 初始化标志
 };
@@ -75,8 +75,8 @@ bool app_fan_init(void)
 
 	pthread_mutex_lock(&fan.mutex);
 
-	set_pwm_period(PWM_CHIP, PWM_CHANNEL, fan.period);		   // 设置周期（控制风速）
-	set_pwm_duty_cycle(PWM_CHIP, PWM_CHANNEL, fan.duty_cycle); // 设置占空比（控制强度）
+	set_pwm_period(PWM_CHIP, PWM_CHANNEL, fan.period);		   // 设置周期(控制风速)
+	set_pwm_duty_cycle(PWM_CHIP, PWM_CHANNEL, fan.duty_cycle); // 设置占空比(控制强度)
 
 	pthread_mutex_unlock(&fan.mutex);
 
@@ -103,7 +103,7 @@ void fans_control(bool enable)
 }
 
 /**
- * @brief 提升风扇风速（增加频率）
+ * @brief 提升风扇风速(增加频率)
  * 
  */
 void app_fans_faster(void)
@@ -120,7 +120,7 @@ void app_fans_faster(void)
 }
 
 /**
- * @brief 降低风扇风速（降低频率）
+ * @brief 降低风扇风速(降低频率)
  * 
  */
 void app_fans_slower(void)
@@ -137,7 +137,7 @@ void app_fans_slower(void)
 }
 
 /**
- * @brief 提升风扇强度（增加占空比）
+ * @brief 提升风扇强度(增加占空比)
  * 
  */
 void app_fans_stronger(void)
@@ -154,7 +154,7 @@ void app_fans_stronger(void)
 }
 
 /**
- * @brief 降低风扇强度（减少占空比）
+ * @brief 降低风扇强度(减少占空比)
  * 
  */
 void app_fans_weaker(void)
