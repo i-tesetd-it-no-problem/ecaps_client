@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -15,15 +16,15 @@
 #include "app/algorithm.h"
 
 /**
- * 将数据读取与计算逻辑分离，将计算放到独立线程中。
- * 去除过多的全局变量，使用一个上下文结构体统一管理状态。
+ * 将数据读取与计算逻辑分离,将计算放到独立线程中。
+ * 去除过多的全局变量,使用一个上下文结构体统一管理状态。
  * 
  * 改动点：
- * 1. 增加 max30102_context_t 结构体，用于存放所有原先的全局状态数据。
- * 2. 在初始化函数中创建线程，用于持续从设备读取数据，并定期调用算法计算心率和血氧。
+ * 1. 增加 struct max30102_task 结构体,用于存放所有原先的全局状态数据。
+ * 2. 在初始化函数中创建线程,用于持续从设备读取数据,并定期调用算法计算心率和血氧。
  * 3. 原先在 init 和 task 函数中的计算移到线程中进行。
- * 4. app_max30102_task 中不再重复从设备读取数据，只需要从共享数据中获取当前结果或执行展示逻辑。
- * 5. 去初始化时停止线程，确保安全退出。
+ * 4. app_max30102_task 中不再重复从设备读取数据,只需要从共享数据中获取当前结果或执行展示逻辑。
+ * 5. 去初始化时停止线程,确保安全退出。
  */
 
 #define MAX30102_FILE_PATH "/dev/iio:device2" // 用于数据读取的设备节点
@@ -38,7 +39,7 @@
 #define DATA_BUF_SIZE 400
 #define SAMPLES_PER_CYCLE 100
 
-typedef struct {
+struct max30102_task {
 	int fd;
 	int spo2_valid;
 	int SpO2;
@@ -51,15 +52,6 @@ typedef struct {
 	pthread_t calc_thread;
 	pthread_mutex_t data_lock;
 	bool thread_running;
-} max30102_context_t;
-
-static max30102_context_t ctx = {
-	.fd = -1,
-	.spo2_valid = 0,
-	.SpO2 = 0,
-	.hr_valid = 0,
-	.heart_rate = 0,
-	.thread_running = false,
 };
 
 static int write_sys_int(const char *filename, int data)
@@ -125,11 +117,11 @@ static int set_buffer_len(int len)
 	return write_sys_int(BUFFER_LENGTH_PATH, len);
 }
 
-static void cleanup(void)
+static void cleanup(struct max30102_task *max30102)
 {
-	if (ctx.fd >= 0) {
-		close(ctx.fd);
-		ctx.fd = -1;
+	if (max30102->fd >= 0) {
+		close(max30102->fd);
+		max30102->fd = -1;
 	}
 	enable_disable_buffer(0);
 	enable_disable_all_channels(0);
@@ -182,131 +174,154 @@ static void shift_data_buffer(
 
 static void *calc_thread_func(void *arg)
 {
+	struct max30102_task *max30102 = arg;
+
 	// 首次读取DATA_BUF_SIZE个样本初始化
 	for (int j = 0; j < DATA_BUF_SIZE; j++) {
-		if (!read_one_sample(ctx.fd, &ctx.aun_red_buf[j], &ctx.aun_ir_buf[j])) {
-			// 如果读取失败，可根据需要重试或退出
+		if (!read_one_sample(max30102->fd, &max30102->aun_red_buf[j], &max30102->aun_ir_buf[j])) {
+			// 如果读取失败,可根据需要重试或退出
 			j--;
 		}
 	}
 
 	// 初次计算
-	pthread_mutex_lock(&ctx.data_lock);
-	maxim_heart_rate_and_oxygen_saturation(ctx.aun_ir_buf, DATA_BUF_SIZE, ctx.aun_red_buf,
-		&ctx.SpO2, &ctx.spo2_valid, &ctx.heart_rate, &ctx.hr_valid);
-	pthread_mutex_unlock(&ctx.data_lock);
+	pthread_mutex_lock(&max30102->data_lock);
+	maxim_heart_rate_and_oxygen_saturation(max30102->aun_ir_buf, DATA_BUF_SIZE,
+		max30102->aun_red_buf, &max30102->SpO2, &max30102->spo2_valid, &max30102->heart_rate,
+		&max30102->hr_valid);
+	pthread_mutex_unlock(&max30102->data_lock);
 
 	// 按照原逻辑：每次读取100新数据, 移动缓冲区, 再计算
-	while (ctx.thread_running) {
+	while (max30102->thread_running) {
 		// 移动数据
-		shift_data_buffer(ctx.aun_red_buf, ctx.aun_ir_buf, DATA_BUF_SIZE, SAMPLES_PER_CYCLE);
+		shift_data_buffer(
+			max30102->aun_red_buf, max30102->aun_ir_buf, DATA_BUF_SIZE, SAMPLES_PER_CYCLE);
 
 		// 读入100个新数据
 		for (int j = DATA_BUF_SIZE - SAMPLES_PER_CYCLE; j < DATA_BUF_SIZE; j++) {
-			if (!ctx.thread_running)
+			if (!max30102->thread_running)
 				break;
 
-			if (!read_one_sample(ctx.fd, &ctx.aun_red_buf[j], &ctx.aun_ir_buf[j])) {
+			if (!read_one_sample(
+					max30102->fd, &max30102->aun_red_buf[j], &max30102->aun_ir_buf[j])) {
 				j--;
 			}
 		}
 
 		// 再次计算
-		pthread_mutex_lock(&ctx.data_lock);
-		maxim_heart_rate_and_oxygen_saturation(ctx.aun_ir_buf, DATA_BUF_SIZE, ctx.aun_red_buf,
-			&ctx.SpO2, &ctx.spo2_valid, &ctx.heart_rate, &ctx.hr_valid);
-		pthread_mutex_unlock(&ctx.data_lock);
+		pthread_mutex_lock(&max30102->data_lock);
+		maxim_heart_rate_and_oxygen_saturation(max30102->aun_ir_buf, DATA_BUF_SIZE,
+			max30102->aun_red_buf, &max30102->SpO2, &max30102->spo2_valid, &max30102->heart_rate,
+			&max30102->hr_valid);
+		pthread_mutex_unlock(&max30102->data_lock);
 	}
 	return NULL;
 }
 
 /**
- * @brief 初始化函数
- * @return true 初始化成功，否则false
+ * @brief 初始化采集模块
+ * 
+ * @param p_priv 私有数据二级指针
+ * @return true 初始化成功
+ * @return false 初始化失败
  */
-bool app_max30102_init(void)
+bool app_max30102_init(void **p_priv)
 {
-	if (enable_disable_all_channels(1) < 0)
+	if (!p_priv)
 		return false;
+
+	struct max30102_task *max30102 = malloc(sizeof(struct max30102_task));
+	if (!max30102) {
+		LOG_E("Malloc max30102 failed");
+		return false;
+	}
+	memset(max30102, 0, sizeof(struct max30102_task));
+
+	if (enable_disable_all_channels(1) < 0)
+		goto err_free_max30102;
 
 	if (set_buffer_len(4) < 0) {
 		enable_disable_all_channels(0);
-		return false;
+		goto err_free_max30102;
 	}
 
 	if (enable_disable_buffer(1) < 0) {
 		enable_disable_all_channels(0);
-		return false;
+		goto err_free_max30102;
 	}
 
-	ctx.fd = open(MAX30102_FILE_PATH, O_RDONLY | O_NONBLOCK);
-	if (ctx.fd < 0) {
+	max30102->fd = open(MAX30102_FILE_PATH, O_RDONLY | O_NONBLOCK);
+	if (max30102->fd < 0) {
 		LOG_E("Failed open device: %s\n", strerror(errno));
-		cleanup();
-		return false;
+		goto err_clen;
 	}
 
-	pthread_mutex_init(&ctx.data_lock, NULL);
-	ctx.thread_running = true;
-	if (pthread_create(&ctx.calc_thread, NULL, calc_thread_func, NULL) != 0) {
+	int ret = pthread_mutex_init(&max30102->data_lock, NULL);
+	if (ret != 0) {
+		LOG_E("Init mutex failed");
+		goto err_close_fd;
+	}
+
+	max30102->thread_running = true;
+	if (pthread_create(&max30102->calc_thread, NULL, calc_thread_func, max30102) != 0) {
 		LOG_E("Failed to create calc thread\n");
-		ctx.thread_running = false;
-		cleanup();
-		pthread_mutex_destroy(&ctx.data_lock);
-		return false;
+		goto err_free_mutex;
 	}
 
+	*p_priv = max30102;
 	return true;
+
+err_free_mutex:
+	pthread_mutex_destroy(&max30102->data_lock);
+
+err_close_fd:
+	if (max30102->fd > 0)
+		close(max30102->fd);
+
+err_clen:
+	cleanup(max30102);
+
+err_free_max30102:
+	free(max30102);
+
+	return false;
 }
 
 /**
- * @brief 周期性任务函数：现在不在这里计算，只输出或使用最新的计算结果。
+ * @brief 采集任务
+ * 
+ * @param priv 私有数据指针
  */
-void app_max30102_task(void)
+void app_max30102_task(void *priv)
 {
-	pthread_mutex_lock(&ctx.data_lock);
-	if (ctx.spo2_valid) {
-		get_sensor_data()->max30102.blood_oxygen = ctx.SpO2;
-		LOG_I("SpO2: %d\t", ctx.SpO2);
+	struct max30102_task *max30102 = priv;
+
+	pthread_mutex_lock(&max30102->data_lock);
+	if (max30102->spo2_valid) {
+		get_sensor_data()->max30102.blood_oxygen = max30102->SpO2;
+		LOG_I("SpO2: %d\t", max30102->SpO2);
 	}
 
-	if (ctx.hr_valid) {
-		get_sensor_data()->max30102.heart_rate = ctx.heart_rate;
-		LOG_I("heart rate: %d\n", ctx.heart_rate);
+	if (max30102->hr_valid) {
+		get_sensor_data()->max30102.heart_rate = max30102->heart_rate;
+		LOG_I("heart rate: %d\n", max30102->heart_rate);
 	}
 
-	pthread_mutex_unlock(&ctx.data_lock);
+	pthread_mutex_unlock(&max30102->data_lock);
 }
 
 /**
- * @brief 去初始化函数：释放资源
+ * @brief 去初始化采集模块
+ * 
+ * @param priv 私有数据指针
  */
-void app_max30102_deinit(void)
+void app_max30102_deinit(void *priv)
 {
-	ctx.thread_running = false;
-	pthread_join(ctx.calc_thread, NULL);
-	pthread_mutex_destroy(&ctx.data_lock);
-	cleanup();
-}
+	struct max30102_task *max30102 = priv;
 
-/**
- * @brief 获取当前 SpO2 值
- */
-int get_SpO2(void)
-{
-	pthread_mutex_lock(&ctx.data_lock);
-	int val = ctx.SpO2;
-	pthread_mutex_unlock(&ctx.data_lock);
-	return val;
-}
-
-/**
- * @brief 获取当前心率值
- */
-int get_heart_rate(void)
-{
-	pthread_mutex_lock(&ctx.data_lock);
-	int val = ctx.heart_rate;
-	pthread_mutex_unlock(&ctx.data_lock);
-	return val;
+	max30102->thread_running = false;
+	pthread_join(max30102->calc_thread, NULL);
+	pthread_mutex_destroy(&max30102->data_lock);
+	cleanup(max30102);
+	free(priv);
 }

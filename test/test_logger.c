@@ -59,7 +59,7 @@ void test_null_and_invalid_format()
     LOG_I(NULL);
     LOG_I("Invalid format specifier test: %d %s", 123);
 
-    // 确保程序未崩溃，可以简单通过
+    // 确保程序未崩溃,可以简单通过
     TEST_ASSERT_TRUE(1);
 }
 

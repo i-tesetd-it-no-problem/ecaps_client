@@ -15,23 +15,28 @@ enum led_state {
 };
 
 /**
- * @brief 初始化LED模块
+ * @brief 初始化LED
  * 
- * @return bool
+ * @param p_priv 私有数据二级指针
+ * @return true 初始化成功
+ * @return false 初始化失败
  */
-bool app_led_init(void);
+bool app_led_init(void **p_priv);
 
 /**
- * @brief 关闭LED模块
+ * @brief 去初始化LED
+ * 
+ * @param priv 私有数据指针
  */
-void app_led_deinit(void);
+void app_led_deinit(void *priv);
 
 /**
- * @brief 处理LED任务
+ * @brief LED任务
  * 
- * 此函数应在主事件循环中由对应的定时器触发时调用。
+ * @param priv 私有数据指针
  */
-void app_led_process(void);
+void app_led_task(void *priv);
+
 /**
  * @brief 切换LED状态
  * 

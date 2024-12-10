@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <pthread.h>
 
@@ -13,17 +14,13 @@
 
 #define DIGITAL_BYTES (8)
 
-struct digital_device {
+struct digital_dev {
 	int fd;
 	pthread_mutex_t mutex;
 	uint16_t show_value;
 };
 
-static struct digital_device dig_dev = {
-	.fd = -1,
-	.mutex = PTHREAD_MUTEX_INITIALIZER,
-	.show_value = 0,
-};
+struct digital_dev *digi_ins = NULL;
 
 // 0 - 9 A - F
 static uint8_t digita_map[] = {
@@ -50,16 +47,16 @@ static uint8_t get_map_value(uint8_t input)
 	return input > 15 ? digita_map[0] : digita_map[input];
 }
 
-static bool get_trans_data(uint16_t show_value, uint8_t *buf, uint8_t len)
+static bool get_trans_data(struct digital_dev *digital, uint8_t *buf, uint8_t len)
 {
 	if (!buf || len != DIGITAL_BYTES) {
 		LOG_E("Invalid argument");
 		return false;
 	}
 
-	pthread_mutex_lock(&dig_dev.mutex);
-	uint16_t current_value = dig_dev.show_value;
-	pthread_mutex_unlock(&dig_dev.mutex);
+	pthread_mutex_lock(&digital->mutex);
+	uint16_t current_value = digital->show_value;
+	pthread_mutex_unlock(&digital->mutex);
 
 	for (int j = 0; j < 4; j++) {
 		uint8_t tmp = (current_value >> (12 - 4 * j)) & 0x0F;
@@ -70,69 +67,118 @@ static bool get_trans_data(uint16_t show_value, uint8_t *buf, uint8_t len)
 	return true;
 }
 
-bool app_digital_init(void)
+/**
+ * @brief 初始化数码管
+ * 
+ * @param p_priv 私有数据二级指针
+ * @return true 初始化成功
+ * @return false 初始化失败
+ */
+bool app_digital_init(void **p_priv)
 {
-	dig_dev.fd = open(DEV_PATH, O_WRONLY);
-	if (dig_dev.fd < 0)
+	struct digital_dev *digital = malloc(sizeof(struct digital_dev));
+	if (!digital) {
+		LOG_E("Malloc digital failed");
 		return false;
-	else
-		return true;
+	}
+
+	int ret = pthread_mutex_init(&digital->mutex, NULL);
+	if (ret != 0) {
+		LOG_E("Init mutex failed");
+		goto err_free_digital;
+	}
+
+	digital->fd = open(DEV_PATH, O_WRONLY);
+	if (digital->fd < 0) {
+		LOG_E("Open file:%s failed", DEV_PATH);
+		goto err_free_digital;
+	}
+
+	*p_priv = digital;
+	digi_ins = digital;
+
+	return true;
+
+err_free_digital:
+	free(digital);
+
+	return false;
 }
 
-void app_digital_deinit(void)
+/**
+ * @brief 去初始化数码管
+ * 
+ * @param priv 
+ */
+void app_digital_deinit(void *priv)
 {
-	if (dig_dev.fd >= 0) {
-		close(dig_dev.fd);
-		dig_dev.fd = -1;
+	struct digital_dev *digital = priv;
+
+	if (digital->fd >= 0) {
+		close(digital->fd);
+		digital->fd = -1;
 		LOG_I("Digital device closed.");
 	}
+
+	free(digital);
 }
 
-static void digital_test(void)
+/**
+ * @brief 测试代码 累加1s
+ * 
+ * @param digital 
+ */
+static void digital_test(struct digital_dev *digital)
 {
 	static size_t counter = 0;
 	counter += APP_DIGITAL_TASK_PERIOD;
 	if (counter >= 1000) {
 		counter = 0;
-		dig_dev.show_value++;
+		digital->show_value++;
 	}
 }
 
-void app_digital_task(void)
+/**
+ * @brief 数码管任务
+ * 
+ * @param priv 
+ */
+void app_digital_task(void *priv)
 {
-	if (dig_dev.fd < 0)
+	struct digital_dev *digital = priv;
+
+	if (digital->fd < 0)
 		return;
 
-	digital_test();
+	digital_test(digital);
 
 	uint8_t buf[DIGITAL_BYTES] = { 0 };
-	bool ret = get_trans_data(dig_dev.show_value, buf, sizeof(buf));
+	bool ret = get_trans_data(digital, buf, sizeof(buf));
 	if (!ret)
 		return;
 
 	for (int i = 0; i < 4; i++) {
-		ssize_t num = write(dig_dev.fd, buf + i * 2, 2);
+		ssize_t num = write(digital->fd, buf + i * 2, 2);
 		if (num != 2) {
 			LOG_E("Write data failed, num is %zd", num);
-			close(dig_dev.fd);
-			dig_dev.fd = -1;
+			close(digital->fd);
+			digital->fd = -1;
 			return;
 		}
 	}
 }
 
+/**
+ * @brief 设置数码管显示值
+ * 
+ * @param value 十六进制值 如0x1234 就显示1234
+ */
 void app_change_digital(uint16_t value)
 {
-	pthread_mutex_lock(&dig_dev.mutex);
-	dig_dev.show_value = value;
-	pthread_mutex_unlock(&dig_dev.mutex);
-}
+	if (!digi_ins)
+		return;
 
-uint16_t app_get_digital_value(void)
-{
-	uint16_t value;
-	pthread_mutex_lock(&dig_dev.mutex);
-	value = dig_dev.show_value;
-	pthread_mutex_unlock(&dig_dev.mutex);
-	return value;
+	pthread_mutex_lock(&digi_ins->mutex);
+	digi_ins->show_value = value;
+	pthread_mutex_unlock(&digi_ins->mutex);
 }

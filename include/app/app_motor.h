@@ -1,7 +1,7 @@
 /**
  * @file app_motor.h
  * @author wenshuyu (wsy2161826815@163.com)
- * @brief 振动马达
+ * @brief 峰鸣器
  * @version 1.0
  * @date 2024-12-03
  * 
@@ -30,45 +30,51 @@
 #ifndef _APP_MOTOR_
 #define _APP_MOTOR_
 
+#include "app/app_pwm.h"
 #include <stdbool.h>
+#include <stdint.h>
+
+#define MAX_MOTOR_PERIOD (100U)			// 最大频率
+#define MAX_MOTOR_DUTY MAX_MOTOR_PERIOD // 最大占空值
 
 /**
- * @brief 初始化震动马达
+ * @brief 初始化
  * 
- * @return true 
- * @return false 
+ * @param p_priv 私有数据二级指针
+ * @return true 初始化成功
+ * @return false 初始化失败
  */
-bool app_motor_init(void);
+bool app_motor_init(void **p_priv);
 
 /**
- * @brief 开启/关闭震动马达
+ * @brief 开启/关闭
  * 
  * @param enable 
  */
-void vibration_motor_control(bool enable);
+void motor_control(bool enable);
 
 /**
- * @brief 提升震动强度(增加占空比)
+ * @brief 提高占空比
  * 
  */
-void app_motor_stronger(void);
+void app_motor_add_duty(size_t duty);
 
 /**
- * @brief 降低震动强度(减少占空比)
+ * @brief 减少占空比
  * 
  */
-void app_motor_weaker(void);
+void app_motor_sub_duty(size_t duty);
 
 /**
- * @brief 提升震动频率(增加振动速度)
+ * @brief 提高周期
  * 
  */
-void app_motor_faster(void);
+void app_motor_add_period(size_t period);
 
 /**
- * @brief 降低震动频率(减慢振动速度)
+ * @brief 减少周期
  * 
  */
-void app_motor_slower(void);
+void app_motor_sub_period(size_t period);
 
 #endif /* _APP_MOTOR_ */

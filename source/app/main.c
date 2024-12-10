@@ -8,7 +8,7 @@
 // LED 任务
 static struct epoll_timer_task led_task = {
 	.f_init = app_led_init,
-	.f_entry = app_led_process,
+	.f_entry = app_led_task,
 	.f_deinit = app_led_deinit,
 	.period_ms = APP_LED_TASK_PERIOD_MS,
 };
@@ -16,16 +16,16 @@ static struct epoll_timer_task led_task = {
 // 采集温湿度任务
 static struct epoll_timer_task si7006_task = {
 	.f_init = app_si7006_init,
-	.f_entry = app_si7006_collect,
+	.f_entry = app_si7006_task,
 	.f_deinit = app_si7006_deinit,
 	.period_ms = APP_SI7006_TASK_PERIOD,
 };
 
 // 采集工作电压/电流任务
 struct epoll_timer_task coll_i_v_task = {
-	.f_init = app_coll_i_v_init,
-	.f_entry = collect_data,
-	.f_deinit = app_coll_i_v_deinit,
+	.f_init = app_lmv358_init,
+	.f_entry = app_lmv358_task,
+	.f_deinit = app_lmv358_deinit,
 	.period_ms = APP_COLL_I_V_PERIOD,
 };
 
@@ -64,7 +64,7 @@ struct epoll_timer_task motor_task = {
 // 红外/光强/接近 任务
 struct epoll_timer_task ap3216c_task = {
 	.f_init = app_ap3216c_init,
-	.f_entry = app_ap3216c_collect,
+	.f_entry = app_ap3216c_task,
 	.f_deinit = app_ap3216c_deinit,
 	.period_ms = APP_AP3216C_TASK_PEIOD,
 };
@@ -85,23 +85,31 @@ struct epoll_timer_task upload_task = {
 	.period_ms = APP_UPLOAD_TASK_PERIOD,
 };
 
+struct epoll_timer_task rs485_task = {
+	.f_init = app_rs485_init,
+	.f_entry = app_rs485_task,
+	.f_deinit = app_rs485_deinit,
+	.period_ms = APP_RS485_TASK_PERIOD,
+};
+
 static volatile et_handle ept = NULL;
 
 static void sigint_handler(int signum)
 {
 	if (ept)
-		epoll_timer_stop(ept);
+		epoll_timer_stop(ept); // 退出监听
 }
 
 int main(void)
 {
+	// 创建监听实例
 	ept = epoll_timer_create();
 	if (!ept) {
 		LOG_E("Failed to create epoll timer.");
 		return -1;
 	}
 
-	// Kill信号清理资源
+	// 设置 Kill 信号 清理资源
 	struct sigaction sa;
 	sa.sa_handler = sigint_handler;
 	sa.sa_flags = 0;
@@ -118,6 +126,7 @@ int main(void)
 	epoll_timer_add_task(ept, &motor_task);
 	epoll_timer_add_task(ept, &ap3216c_task);
 	epoll_timer_add_task(ept, &max30102_task);
+	epoll_timer_add_task(ept, &rs485_task);
 #else
 	epoll_timer_add_task(ept, &upload_task);
 #endif

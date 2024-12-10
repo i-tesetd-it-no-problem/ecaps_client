@@ -36,7 +36,7 @@
 /**
  * @brief 随机数生成器
  * 
- * @param p_rng 无用参数，为了适配mbedtls的接口, 可为NULL
+ * @param p_rng 无用参数,为了适配mbedtls的接口, 可为NULL
  * @param buf 随机数缓冲区
  * @param len 随机数长度
  * @return int 成功返回0, 失败返回非0

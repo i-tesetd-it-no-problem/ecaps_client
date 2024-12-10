@@ -2,21 +2,11 @@
 #include "app/algorithm.h"
 #include "json/sensor_json.h"
 #include <stdio.h>
-#include "app/app_beep.h"
-#include "app/app_digital.h"
-#include "app/app_fans.h"
-#include "app/app_led.h"
-#include "app/app_si7006.h"
-#include "app/app_motor.h"
-#include "app/app_vol_cur.h"
-#include "app/app_ap3216c.h"
-#include "app/app_max30102.h"
+#include <stdlib.h>
 #include "app/app_upload.h"
 
 #include "ssl/ssl_client.h"
 #include "utils/logger.h"
-
-static ssl_handle sh = NULL;
 
 #ifdef BOARD_ENV
 #define SERVER_URL "https://49.51.40.135:8001/" // 服务器URL
@@ -31,28 +21,7 @@ static ssl_handle sh = NULL;
 #define POST_URL SERVER_URL "submit"			   // POST 请求URL
 #define SENSOR_URL SERVER_URL "submit_sensor_data" // POST 请求URL
 
-bool app_upload_init(void)
-{
-	int ret = ssl_client_init(&sh); // 初始化客户端
-	if (ret)
-		return false;
-
-	ret = ssl_client_connect(sh, SERVER_URL); // 建立连接
-	if (ret) {
-		ssl_client_free(sh);
-		return false;
-	}
-
-	return true;
-}
-
-void app_upload_deinit(void)
-{
-	ssl_client_close(sh);
-	ssl_client_free(sh);
-}
-
-static void app_upload_sensor_data(void)
+static void app_upload_sensor_data(ssl_handle sh)
 {
 	if (!sh)
 		return;
@@ -71,7 +40,75 @@ static void app_upload_sensor_data(void)
 	printf("%s\n", resp_body);
 }
 
-void app_upload_task(void)
+/**
+ * @brief SSL客户端初始化
+ * 
+ * @param p_priv 私有数据二级指针
+ * @return true 初始化成功
+ * @return false 初始化失败
+ */
+bool app_upload_init(void **p_priv)
 {
-	app_upload_sensor_data();
+	ssl_handle *sh = malloc(sizeof(ssl_handle));
+	if (!sh) {
+		LOG_E("Malloc ssl_handle failed");
+		return false;
+	}
+
+	int ret = ssl_client_init(sh); // 初始化客户端
+	if (ret) {
+		LOG_E("Init ssl client failed");
+		goto err_free_sh;
+	}
+
+	ret = ssl_client_connect(*sh, SERVER_URL); // 建立连接
+	if (ret) {
+		LOG_E("Connect ssl failed");
+		goto err_free_client;
+	}
+
+	*p_priv = sh;
+
+	return true;
+
+err_free_client:
+	ssl_client_free(*sh);
+
+err_free_sh:
+	free(sh);
+
+	return false;
+}
+
+/**
+ * @brief SSL客户端去初始化
+ * 
+ * @param priv 私有数据指针
+ */
+void app_upload_deinit(void *priv)
+{
+	if (!priv)
+		return;
+
+	ssl_handle *sh = priv;
+
+	ssl_client_close(*sh);
+	ssl_client_free(*sh);
+
+	free(sh);
+}
+
+/**
+ * @brief SSL客户端任务
+ * 
+ * @param priv 私有数据指针
+ */
+void app_upload_task(void *priv)
+{
+	if (!priv)
+		return;
+
+	ssl_handle *sh = priv;
+
+	app_upload_sensor_data(*sh);
 }

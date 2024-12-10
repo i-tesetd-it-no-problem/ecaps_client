@@ -1,5 +1,5 @@
 /**
- * @file app_motor.c
+ * @file app_fan.c
  * @author wenshuyu (wsy2161826815@163.com)
  * @brief 蜂鸣器
  * @version 1.0
@@ -27,7 +27,7 @@
  * 
  */
 
-#include "app/app_motor.h"
+#include "app/app_fan.h"
 #include "app/app_pwm.h"
 
 #include "utils/logger.h"
@@ -36,17 +36,17 @@
 #include <stdbool.h>
 #include <pthread.h>
 
-#define PWM_CHIP (8U)	 // PWM 号
+#define PWM_CHIP (4U)	 // PWM 号
 #define PWM_CHANNEL (0U) // PWM 通道 1
 #define CALC_STEP (10)	 // 步长 10
 
-struct app_motor {
+struct app_fan {
 	size_t period;		   // 周期
 	size_t duty_cycle;	   // 占空比
 	pthread_mutex_t mutex; // 互斥锁
 };
 
-static struct app_motor *motor = NULL;
+static struct app_fan *fan = NULL;
 
 /**
  * @brief 初始化
@@ -55,48 +55,48 @@ static struct app_motor *motor = NULL;
  * @return true 初始化成功
  * @return false 初始化失败
  */
-bool app_motor_init(void **p_priv)
+bool app_fan_init(void **p_priv)
 {
 	bool ret = false;
 
 	// 实例化
-	struct app_motor *p_motor = malloc(sizeof(struct app_motor));
-	if (!p_motor) {
+	struct app_fan *p_fan = malloc(sizeof(struct app_fan));
+	if (!p_fan) {
 		LOG_E("Malloc vep failed");
 		return false;
 	}
 
-	int res = pthread_mutex_init(&p_motor->mutex, NULL);
+	int res = pthread_mutex_init(&p_fan->mutex, NULL);
 	if (ret != 0) {
 		LOG_E("Init mutex failed");
-		goto err_free_motor;
+		goto err_free_fan;
 	}
-	p_motor->period = 1000;
-	p_motor->duty_cycle = 500;
+	p_fan->period = 1000;
+	p_fan->duty_cycle = 500;
 
 	ret = export_pwm(PWM_CHIP, PWM_CHANNEL);
 	if (!ret) {
-		LOG_E("create motor failed");
+		LOG_E("create fan failed");
 		goto err_free_mutex;
 	}
 
-	pthread_mutex_lock(&p_motor->mutex);
+	pthread_mutex_lock(&p_fan->mutex);
 
-	set_pwm_period(PWM_CHIP, PWM_CHANNEL, p_motor->period);		   // 设置周期(音调)
-	set_pwm_duty_cycle(PWM_CHIP, PWM_CHANNEL, p_motor->duty_cycle); // 设置占空比(强度)
+	set_pwm_period(PWM_CHIP, PWM_CHANNEL, p_fan->period);		   // 设置周期(音调)
+	set_pwm_duty_cycle(PWM_CHIP, PWM_CHANNEL, p_fan->duty_cycle); // 设置占空比(强度)
 
-	pthread_mutex_unlock(&p_motor->mutex);
+	pthread_mutex_unlock(&p_fan->mutex);
 
-	*p_priv = p_motor;
-	motor = p_motor;
+	*p_priv = p_fan;
+	fan = p_fan;
 
 	return true;
 
 err_free_mutex:
-	pthread_mutex_destroy(&motor->mutex);
+	pthread_mutex_destroy(&fan->mutex);
 
-err_free_motor:
-	free(motor);
+err_free_fan:
+	free(fan);
 
 	return false;
 }
@@ -106,98 +106,98 @@ err_free_motor:
  * 
  * @param enable 
  */
-void motor_control(bool enable)
+void fan_control(bool enable)
 {
-	pthread_mutex_lock(&motor->mutex);
+	pthread_mutex_lock(&fan->mutex);
 
-	if (!motor)
+	if (!fan)
 		return;
 
 	enable_pwm(PWM_CHIP, PWM_CHANNEL, enable);
 
-	pthread_mutex_unlock(&motor->mutex);
+	pthread_mutex_unlock(&fan->mutex);
 }
 
 /**
  * @brief 提高占空比
  * 
  */
-void app_motor_add_duty(size_t duty)
+void app_fan_add_duty(size_t duty)
 {
-	if (!motor)
+	if (!fan)
 		return;
 
-	pthread_mutex_lock(&motor->mutex);
+	pthread_mutex_lock(&fan->mutex);
 
-	if (MAX_MOTOR_DUTY - duty < motor->duty_cycle)
-		motor->duty_cycle = MAX_MOTOR_DUTY;
+	if (MAX_FAN_DUTY - duty < fan->duty_cycle)
+		fan->duty_cycle = MAX_FAN_DUTY;
 	else
-		motor->duty_cycle += duty;
+		fan->duty_cycle += duty;
 
-	set_pwm_duty_cycle(PWM_CHIP, PWM_CHANNEL, motor->duty_cycle);
+	set_pwm_duty_cycle(PWM_CHIP, PWM_CHANNEL, fan->duty_cycle);
 
-	pthread_mutex_unlock(&motor->mutex);
+	pthread_mutex_unlock(&fan->mutex);
 }
 
 /**
  * @brief 减少占空比
  * 
  */
-void app_motor_sub_duty(size_t duty)
+void app_fan_sub_duty(size_t duty)
 {
-	if (!motor)
+	if (!fan)
 		return;
 
-	pthread_mutex_lock(&motor->mutex);
+	pthread_mutex_lock(&fan->mutex);
 
-	if (motor->duty_cycle < duty)
-		motor->duty_cycle = 0;
+	if (fan->duty_cycle < duty)
+		fan->duty_cycle = 0;
 	else
-		motor->duty_cycle -= duty;
+		fan->duty_cycle -= duty;
 
-	set_pwm_duty_cycle(PWM_CHIP, PWM_CHANNEL, motor->duty_cycle);
+	set_pwm_duty_cycle(PWM_CHIP, PWM_CHANNEL, fan->duty_cycle);
 
-	pthread_mutex_unlock(&motor->mutex);
+	pthread_mutex_unlock(&fan->mutex);
 }
 
 /**
  * @brief 提高周期
  * 
  */
-void app_motor_add_period(size_t period)
+void app_fan_add_period(size_t period)
 {
-	if (!motor)
+	if (!fan)
 		return;
 
-	pthread_mutex_lock(&motor->mutex);
+	pthread_mutex_lock(&fan->mutex);
 
-	if (MAX_MOTOR_DUTY - period < motor->period)
-		motor->period = MAX_MOTOR_PERIOD;
+	if (MAX_FAN_DUTY - period < fan->period)
+		fan->period = MAX_FAN_PERIOD;
 	else
-		motor->period += period;
+		fan->period += period;
 
-	set_pwm_period(PWM_CHIP, PWM_CHANNEL, motor->period);
+	set_pwm_period(PWM_CHIP, PWM_CHANNEL, fan->period);
 
-	pthread_mutex_unlock(&motor->mutex);
+	pthread_mutex_unlock(&fan->mutex);
 }
 
 /**
  * @brief 减少周期
  * 
  */
-void app_motor_sub_period(size_t period)
+void app_fan_sub_period(size_t period)
 {
-	if (!motor)
+	if (!fan)
 		return;
 
-	pthread_mutex_lock(&motor->mutex);
+	pthread_mutex_lock(&fan->mutex);
 
-	if (motor->period < period)
-		motor->period = 0;
+	if (fan->period < period)
+		fan->period = 0;
 	else
-		motor->period -= period;
+		fan->period -= period;
 
-	set_pwm_period(PWM_CHIP, PWM_CHANNEL, motor->period);
+	set_pwm_period(PWM_CHIP, PWM_CHANNEL, fan->period);
 
-	pthread_mutex_unlock(&motor->mutex);
+	pthread_mutex_unlock(&fan->mutex);
 }

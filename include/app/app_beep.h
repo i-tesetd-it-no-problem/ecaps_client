@@ -30,45 +30,51 @@
 #ifndef _APP_BEEP_
 #define _APP_BEEP_
 
+#include "app/app_pwm.h"
 #include <stdbool.h>
+#include <stdint.h>
+
+#define MAX_BEEP_PERIOD (100U)		  // 最大频率
+#define MAX_BEEP_DUTY MAX_BEEP_PERIOD // 最大占空值
 
 /**
- * @brief 初始化蜂鸣器
+ * @brief 初始化
  * 
- * @return true 
- * @return false 
+ * @param p_priv 私有数据二级指针
+ * @return true 初始化成功
+ * @return false 初始化失败
  */
-bool app_beep_init(void);
+bool app_beep_init(void **p_priv);
 
 /**
- * @brief 开启/关闭蜂鸣器
+ * @brief 开启/关闭
  * 
  * @param enable 
  */
 void beep_control(bool enable);
 
 /**
- * @brief 提升音量(增加响度)
+ * @brief 提高占空比
  * 
  */
-void app_beep_higher(void);
+void app_beep_add_duty(size_t duty);
 
 /**
- * @brief 降低音量(减小响度)
+ * @brief 减少占空比
  * 
  */
-void app_beep_lower(void);
+void app_beep_sub_duty(size_t duty);
 
 /**
- * @brief 提升音调(增加频率)
+ * @brief 提高周期
  * 
  */
-void app_beep_higher_tone(void);
+void app_beep_add_period(size_t period);
 
 /**
- * @brief 降低音调(降低频率)
+ * @brief 减少周期
  * 
  */
-void app_beep_lower_tone(void);
+void app_beep_sub_period(size_t period);
 
 #endif /* _APP_BEEP_ */

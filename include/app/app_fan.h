@@ -1,9 +1,9 @@
 /**
- * @file app_vol_cur.h
+ * @file app_fan.h
  * @author wenshuyu (wsy2161826815@163.com)
- * @brief 扩展版工作电压电流采集
+ * @brief 峰鸣器
  * @version 1.0
- * @date 2024-12-04
+ * @date 2024-12-03
  * 
  * @copyright Copyright (c) 2024
  * 
@@ -27,26 +27,54 @@
  * 
  */
 
-#ifndef _APP_VOL_CUR_H
-#define _APP_VOL_CUR_H
+#ifndef _APP_FAN_
+#define _APP_FAN_
 
+#include "app/app_pwm.h"
 #include <stdbool.h>
+#include <stdint.h>
 
-#define APP_COLL_I_V_PERIOD (500U)
+#define MAX_FAN_PERIOD (100U)		// 最大频率
+#define MAX_FAN_DUTY MAX_FAN_PERIOD // 最大占空值
 
-// 初始化电压电流采集模块
-bool app_coll_i_v_init(void);
+/**
+ * @brief 初始化
+ * 
+ * @param p_priv 私有数据二级指针
+ * @return true 初始化成功
+ * @return false 初始化失败
+ */
+bool app_fan_init(void **p_priv);
 
-// 关闭电压电流采集模块
-void app_coll_i_v_deinit(void);
+/**
+ * @brief 开启/关闭
+ * 
+ * @param enable 
+ */
+void fan_control(bool enable);
 
-// 采集电压和电流数据
-void collect_data(void);
+/**
+ * @brief 提高占空比
+ * 
+ */
+void app_fan_add_duty(size_t duty);
 
-// 获取电压
-float get_voltage(void);
+/**
+ * @brief 减少占空比
+ * 
+ */
+void app_fan_sub_duty(size_t duty);
 
-// 获取电流
-float get_current(void);
+/**
+ * @brief 提高周期
+ * 
+ */
+void app_fan_add_period(size_t period);
 
-#endif /* _APP_VOL_CUR_H */
+/**
+ * @brief 减少周期
+ * 
+ */
+void app_fan_sub_period(size_t period);
+
+#endif /* _APP_FAN_ */

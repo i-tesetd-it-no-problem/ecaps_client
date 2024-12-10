@@ -8,35 +8,26 @@
 #define APP_SI7006_TASK_PERIOD (2000U)
 
 /**
- * @brief 初始化温湿度采集模块
+ * @brief 初始化采集模块
  * 
- * @return bool
+ * @param p_priv 私有数据二级指针
+ * @return true 初始化成功
+ * @return false 初始化失败
  */
-bool app_si7006_init(void);
+bool app_si7006_init(void **p_priv);
 
 /**
- * @brief 关闭温湿度采集模块
+ * @brief 去初始化采集模块
+ * 
+ * @param priv 私有数据指针
  */
-void app_si7006_deinit(void);
+void app_si7006_deinit(void *priv);
 
 /**
- * @brief 采集温湿度数据
+ * @brief 采集任务
  * 
+ * @param priv 私有数据指针
  */
-void app_si7006_collect(void);
-
-/**
- * @brief 获取湿度
- * 
- * @return float 湿度值 (%RH)
- */
-float get_humidity(void);
-
-/**
- * @brief 获取温度
- * 
- * @return float 温度值 (°C)
- */
-float get_temperature(void);
+void app_si7006_task(void *priv);
 
 #endif /* _APP_SI7006_H */

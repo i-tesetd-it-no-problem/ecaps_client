@@ -1,10 +1,10 @@
 #include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdbool.h>
-#include <errno.h>
 
 #include "app/app_si7006.h"
 #include "utils/logger.h"
@@ -20,58 +20,68 @@ enum si7006_cmd {
 };
 
 struct si7006_task {
-	int fd;			   // 文件描述符
-	float humidity;	   // 转换后的湿度 (%RH)
-	float temperature; // 转换后的温度 (°C)
-};
-
-static struct si7006_task si7006 = {
-	.fd = -1,
-	.humidity = 0.0f,
-	.temperature = 0.0f,
+	int fd; // 文件描述符
 };
 
 /**
- * @brief 初始化温湿度采集模块
+ * @brief 初始化采集模块
  * 
- * @return bool
+ * @param p_priv 私有数据二级指针
+ * @return true 初始化成功
+ * @return false 初始化失败
  */
-bool app_si7006_init(void)
+bool app_si7006_init(void **p_priv)
 {
-	if (si7006.fd != -1) {
-		LOG_W("SI7006 device already initialized.");
-		return true;
+	struct si7006_task *si7006 = malloc(sizeof(struct si7006_task));
+	if (!si7006) {
+		LOG_E("Malloc si7006 ffailed");
+		return false;
 	}
+	memset(si7006, 0, sizeof(struct si7006_task));
 
-	si7006.fd = open(SI7006_FILE_PATH, O_RDWR);
-	if (si7006.fd < 0) {
-		LOG_E("Can't open device %s: %s", SI7006_FILE_PATH, strerror(errno));
+	si7006->fd = open(SI7006_FILE_PATH, O_RDWR);
+	if (si7006->fd < 0) {
+		free(si7006);
+		LOG_E("Can't open device %s", SI7006_FILE_PATH);
 		return false;
 	}
 
-	LOG_I("SI7006 device opened: %s", SI7006_FILE_PATH);
+	*p_priv = si7006;
+
 	return true;
 }
 
 /**
- * @brief 关闭温湿度采集模块
+ * @brief 去初始化采集模块
+ * 
+ * @param priv 私有数据指针
  */
-void app_si7006_deinit(void)
+void app_si7006_deinit(void *priv)
 {
-	if (si7006.fd >= 0) {
-		close(si7006.fd);
-		si7006.fd = -1;
-		LOG_I("SI7006 device closed.");
-	}
+	if (!priv)
+		return;
+
+	struct si7006_task *si7006 = priv;
+
+	if (si7006->fd >= 0)
+		close(si7006->fd);
+
+	free(si7006);
 }
 
 /**
- * @brief 采集温湿度数据
+ * @brief 采集任务
  * 
+ * @param priv 私有数据指针
  */
-void app_si7006_collect(void)
+void app_si7006_task(void *priv)
 {
-	if (si7006.fd < 0) {
+	if (!priv)
+		return;
+
+	struct si7006_task *si7006 = priv;
+
+	if (si7006->fd < 0) {
 		LOG_E("SI7006 device not opened.");
 		return;
 	}
@@ -80,21 +90,21 @@ void app_si7006_collect(void)
 	uint8_t mea_cmd2 = MEASURE_TEMEPERATURE;
 
 	// 发送测量湿度指令
-	ssize_t num = write(si7006.fd, &mea_cmd1, 1);
+	ssize_t num = write(si7006->fd, &mea_cmd1, 1);
 	if (num != 1) {
 		LOG_E("Failed to write humidity measure command, err: %zd", num);
 		return;
 	}
 
 	// 发送测量温度指令
-	num = write(si7006.fd, &mea_cmd2, 1);
+	num = write(si7006->fd, &mea_cmd2, 1);
 	if (num != 1) {
 		LOG_E("Failed to write temperature measure command, err: %zd", num);
 		return;
 	}
 
 	uint8_t read_data[4] = { 0 }; // 读取4字节数据
-	num = read(si7006.fd, read_data, 4);
+	num = read(si7006->fd, read_data, 4);
 	if (num != 4) {
 		LOG_E("Failed to read data, err: %zd", num);
 		return;
@@ -108,33 +118,10 @@ void app_si7006_collect(void)
 	float actual_humidity = (125.0f * raw_humidity / 65536.0f) - 6.0f;
 	float actual_temperature = (175.72f * raw_temperature / 65536.0f) - 46.85f;
 
-	si7006.humidity = actual_humidity;
-	si7006.temperature = actual_temperature;
+	LOG_I("Humidity: %.2f %%RH, Temperature: %.2f °C", actual_humidity, actual_temperature);
 
-	LOG_I("Humidity: %.2f %%RH, Temperature: %.2f °C", si7006.humidity, si7006.temperature);
+	get_sensor_data()->si7006.humidity = actual_humidity;
+	get_sensor_data()->si7006.temperature = actual_temperature;
 
-	get_sensor_data()->si7006.humidity = si7006.humidity;
-	get_sensor_data()->si7006.temperature = si7006.temperature;
-    
 	return;
-}
-
-/**
- * @brief 获取湿度
- * 
- * @return float 湿度值 (%RH)
- */
-float get_humidity(void)
-{
-	return si7006.humidity;
-}
-
-/**
- * @brief 获取温度
- * 
- * @return float 温度值 (°C)
- */
-float get_temperature(void)
-{
-	return si7006.temperature;
 }

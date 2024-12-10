@@ -28,21 +28,21 @@ openssl genrsa -out ca.key 4096
 openssl req -new -x509 -days 3650 -key ca.key -out ca.pem
 ```
 
-在执行 命令时，系统会提示您输入一些信息：
+在执行 命令时,系统会提示您输入一些信息：
 
-- **Country Name (2 letter code) [XX]**: 输入国家代码，例如 CN 表示中国。
-- **State or Province Name (full name) []**: 输入省份名称，例如 ShangHai。
-- **Locality Name (eg, city) [Default City]**: 输入城市名称，例如 ShangHai。
-- **Organization Name (eg, company) [Default Company Ltd]**: 输入您的组织或公司名称，例如 My Company。
-- **Organizational Unit Name (eg, section) []**: 输入组织单位名称，例如 IT Department。
-- **Common Name (eg, your name or your server's hostname) []**: 输入 CA 的名称，例如 My Root CA。
-- **Email Address []**: 输入联系邮箱，或留空。
+- **Country Name (2 letter code) [XX]**: 输入国家代码,例如 CN 表示中国。
+- **State or Province Name (full name) []**: 输入省份名称,例如 ShangHai。
+- **Locality Name (eg, city) [Default City]**: 输入城市名称,例如 ShangHai。
+- **Organization Name (eg, company) [Default Company Ltd]**: 输入您的组织或公司名称,例如 My Company。
+- **Organizational Unit Name (eg, section) []**: 输入组织单位名称,例如 IT Department。
+- **Common Name (eg, your name or your server's hostname) []**: 输入 CA 的名称,例如 My Root CA。
+- **Email Address []**: 输入联系邮箱,或留空。
 
 ## 2. 使用 CA 签发服务器证书
 
 ### 2.1 创建服务端配置文件 `server.cnf`
 
-在 `ssl_cfg` 目录下创建 `server.cnf` 文件，内容如下：
+在 `ssl_cfg` 目录下创建 `server.cnf` 文件,内容如下：
 
 ```ini
 [ req ]
@@ -64,8 +64,8 @@ CN = your.domain.com  # 替换为您的服务器域名或 IP
 subjectAltName = @alt_names
 
 [ alt_names ]
-DNS.1 = your.domain.com   # 如果使用域名，替换为您的域名
-IP.1  = xxx.xxx.xxx.xxx    # 如果使用 IP，替换为您的服务器 IP 地址
+DNS.1 = your.domain.com   # 如果使用域名,替换为您的域名
+IP.1  = xxx.xxx.xxx.xxx    # 如果使用 IP,替换为您的服务器 IP 地址
 ```
 
 ### 2.2 生成服务器私钥和证书签名请求(CSR)
@@ -91,7 +91,7 @@ openssl x509 -req -in server.csr -CA ca.pem -CAkey ca.key \
 
 ### 3.1 创建客户端配置文件 `client.cnf`
 
-在 `ssl_cfg` 目录下创建 `client.cnf` 文件，内容如下：
+在 `ssl_cfg` 目录下创建 `client.cnf` 文件,内容如下：
 
 ```ini
 [ req ]
@@ -107,7 +107,7 @@ ST = ShangHai
 L  = ShangHai
 O  = My Company
 OU = IT Department
-CN = client   # 客户端的唯一标识符，例如设备名称
+CN = client   # 客户端的唯一标识符,例如设备名称
 
 [ v3_req ]
 subjectAltName = @alt_names
@@ -137,7 +137,7 @@ openssl x509 -req -in client.csr -CA ca.pem -CAkey ca.key \
 
 ## 4. 快速生成
 ### 4.1 新建脚本文件
-进入到 `ssl_cfg` 目录下，新建脚本文件 `create_certificates.sh`，
+进入到 `ssl_cfg` 目录下,新建脚本文件 `create_certificates.sh`,
 内容如下：
 ```shell
 #!/bin/bash

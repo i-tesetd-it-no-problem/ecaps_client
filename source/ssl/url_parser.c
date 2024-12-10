@@ -91,7 +91,7 @@ url_info_t* parse_url(const char *url)
         const char *port_start = url_ptr;
         const char *port_end = strpbrk(port_start, "/");
         if (!port_end) {
-            // 只有端口，没有路径
+            // 只有端口,没有路径
             free(info->port);
             info->port = strdup(port_start);
             info->route = strdup("/");

@@ -442,7 +442,7 @@ static int ssl_client_fetch(ssl_handle client, enum request_type req_type, const
 			free_url_info(url_info);
 			return -1;
 		}
-		// 解析未完成，继续接收数据
+		// 解析未完成,继续接收数据
 	}
 
 	//解析仍未完成
@@ -694,7 +694,7 @@ int ssl_client_connect(ssl_handle client, const char *url)
 
 			return -1;
 		}
-		// 如果返回 WANT_READ 或 WANT_WRITE，继续握手
+		// 如果返回 WANT_READ 或 WANT_WRITE,继续握手
 	}
 
 	// 验证服务器证书

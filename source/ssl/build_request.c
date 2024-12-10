@@ -60,10 +60,10 @@ int build_get_request(const char* url, char* buffer, size_t buffer_size)
     char host_header[256];
     if ((strcmp(url_info->protocol, "http") == 0 && strcmp(url_info->port, "80") != 0) ||
         (strcmp(url_info->protocol, "https") == 0 && strcmp(url_info->port, "443") != 0)) {
-        // 非默认端口，包含端口号
+        // 非默认端口,包含端口号
         snprintf(host_header, sizeof(host_header), "Host: %s:%s\r\n", url_info->host, url_info->port);
     } else {
-        // 默认端口，不包含端口号
+        // 默认端口,不包含端口号
         snprintf(host_header, sizeof(host_header), "Host: %s\r\n", url_info->host);
     }
 
@@ -148,13 +148,13 @@ int build_post_request(const char* url, const char* content_type, const char* bo
         snprintf(host_header, sizeof(host_header), "Host: %s\r\n", url_info->host);
     }
 
-    // 内容类型，允许content_type为空
+    // 内容类型,允许content_type为空
     char content_type_header[256] = "";
     if (content_type) {
         snprintf(content_type_header, sizeof(content_type_header), "Content-Type: %s\r\n", content_type);
     }
 
-    // 内容长度，支持空body
+    // 内容长度,支持空body
     char content_length_header[256];
     size_t body_length = body ? strlen(body) : 0;
     snprintf(content_length_header, sizeof(content_length_header), "Content-Length: %zu\r\n", body_length);

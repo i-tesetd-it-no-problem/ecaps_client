@@ -15,7 +15,7 @@
 #define CLIENT_CER_OBJ_ID       "client.crt"                        // client.crt的可信存储对象ID
 #define CLIENT_KEY_OBJ_ID       "client.key"                        // client.key的可信存储对象ID
 
-// 为了把证书存储到可信环境中, 需要先把证书拷贝到开发板上，再调用接口保存
+// 为了把证书存储到可信环境中, 需要先把证书拷贝到开发板上,再调用接口保存
 #define BOARD_CA_PEM_PATH       "/home/wenshuyu/ca.pem"             // 开发板上的ca.pem路径
 #define BOARD_CLIENT_CER_PATH   "/home/wenshuyu/client.crt"         // 开发板上的client.crt路径
 #define BOARD_CLIENT_KEY_PATH   "/home/wenshuyu/client.key"         // 开发板上的client.key路径

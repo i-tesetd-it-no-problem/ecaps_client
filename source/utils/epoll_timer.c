@@ -31,10 +31,12 @@ struct timer_task {
 	size_t period_ms;	   // 任务周期
 	int timer_fd;		   // 定时器描述符
 
+	void *priv; // 私有数据
 	struct timer_task *prev;
 	struct timer_task *next;
 };
 
+// epoll_timer结构
 struct epoll_timer {
 	struct timer_task *task_list; // 任务链表
 	int epoll_fd;				  // 事件描述符
@@ -46,7 +48,7 @@ struct epoll_timer {
 /**
  * @brief 创建epoll监听句柄
  * 
- * @return et_handle 失败返回NULL 成功返回句柄
+ * @return et_handle 失败返回NULL，成功返回句柄
  */
 et_handle epoll_timer_create(void)
 {
@@ -64,8 +66,8 @@ et_handle epoll_timer_create(void)
 		goto err_free_handle;
 	}
 
-	// 创建epoll实例
-	handle->epoll_fd = epoll_create1(0);
+	// 创建epoll实例，使用EPOLL_CLOEXEC
+	handle->epoll_fd = epoll_create1(EPOLL_CLOEXEC);
 	if (handle->epoll_fd < 0) {
 		LOG_E("Failed to create epoll instance: %s", strerror(errno));
 		goto err_free_mutex;
@@ -78,7 +80,7 @@ et_handle epoll_timer_create(void)
 		goto err_free_epoll;
 	}
 
-	// 将停止事件fd添加到epoll中
+	// 停止事件fd添加到epoll
 	struct epoll_event ev;
 	memset(&ev, 0, sizeof(ev));
 	ev.events = EPOLLIN;
@@ -119,9 +121,11 @@ void epoll_timer_destroy(et_handle handle)
 	if (!handle)
 		return;
 
-	epoll_timer_stop(handle); // 停止轮训监听
+	// 先停止事件监听
+	epoll_timer_stop(handle);
 
-	close(handle->stop_eventfd); // 关闭停止事件
+	// 关闭停止事件fd
+	close(handle->stop_eventfd);
 
 	// 关闭epoll描述符
 	if (handle->epoll_fd >= 0)
@@ -134,13 +138,16 @@ void epoll_timer_destroy(et_handle handle)
 	while (task) {
 		struct timer_task *next_task = task->next;
 
-		if (task->task_f->f_deinit)
-			task->task_f->f_deinit();
+		if (task->task_f) {
+			if (task->task_f->f_deinit)
+				task->task_f->f_deinit(task->priv);
+
+			free(task->task_f);
+		}
 
 		if (task->timer_fd >= 0)
 			close(task->timer_fd);
 
-		free(task->task_f);
 		free(task);
 
 		task = next_task;
@@ -159,8 +166,8 @@ void epoll_timer_destroy(et_handle handle)
  * 
  * @param handle epoll句柄
  * @param task_info 任务指针
- * @return true 
- * @return false 
+ * @return true 成功
+ * @return false 失败
  */
 bool epoll_timer_add_task(et_handle handle, const struct epoll_timer_task *task_info)
 {
@@ -169,27 +176,39 @@ bool epoll_timer_add_task(et_handle handle, const struct epoll_timer_task *task_
 		return false;
 	}
 
-	// 任务初始化
-	if (task_info->f_init && !task_info->f_init()) {
-		LOG_E("Task initialization failed.");
-		return false;
-	}
-
-	// 如果周期为0或没有任务处理函数
-	if (task_info->period_ms == 0 || task_info->f_entry == NULL) {
-		LOG_I("Task has no entry function or zero period, only ran initialization.");
-		return true;
-	}
-
-	// 创建任务
+	// 创建任务实例
 	struct timer_task *new_task = malloc(sizeof(struct timer_task));
 	if (!new_task) {
 		LOG_E("Failed to allocate memory for new task.");
 		return false;
 	}
 	memset(new_task, 0, sizeof(struct timer_task));
+	new_task->timer_fd = -1;
 
-	// 分配任务内存
+	// 任务初始化
+	if (task_info->f_init) {
+		if (!task_info->f_init(&new_task->priv)) {
+			LOG_E("Task initialization failed.");
+			goto err_free_new_task;
+		}
+	}
+
+	// 如果周期为0或没有任务处理函数，只进行初始化
+	if (task_info->period_ms == 0 || task_info->f_entry == NULL) {
+		LOG_I("Task has no entry function or zero period, only ran initialization.");
+
+		// 添加到任务链表
+		pthread_mutex_lock(&handle->lock);
+		new_task->next = handle->task_list;
+		if (handle->task_list)
+			handle->task_list->prev = new_task;
+		handle->task_list = new_task;
+		pthread_mutex_unlock(&handle->lock);
+
+		return true; // 返回成功
+	}
+
+	// 分配任务函数结构
 	new_task->task_f = malloc(sizeof(struct task_f));
 	if (!new_task->task_f) {
 		LOG_E("Failed to allocate memory for task functions.");
@@ -201,7 +220,6 @@ bool epoll_timer_add_task(et_handle handle, const struct epoll_timer_task *task_
 	new_task->task_f->f_entry = task_info->f_entry;
 	new_task->task_f->f_deinit = task_info->f_deinit;
 	new_task->period_ms = task_info->period_ms;
-	new_task->timer_fd = -1;
 
 	// 创建定时器文件描述符
 	new_task->timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC);
@@ -236,7 +254,7 @@ bool epoll_timer_add_task(et_handle handle, const struct epoll_timer_task *task_
 		goto err_close_timer_fd;
 	}
 
-	// 添加到任务链表(尾插法)
+	// 添加到任务链表
 	pthread_mutex_lock(&handle->lock);
 	new_task->next = handle->task_list;
 	if (handle->task_list)
@@ -244,20 +262,22 @@ bool epoll_timer_add_task(et_handle handle, const struct epoll_timer_task *task_
 	handle->task_list = new_task;
 	pthread_mutex_unlock(&handle->lock);
 
-	LOG_I("Added new timer task with period %zu ms.", task_info->period_ms);
-	return true;
+	return true; // 返回成功
 
+// 错误处理
 err_close_timer_fd:
-	close(new_task->timer_fd);
+	if (new_task->timer_fd >= 0)
+		close(new_task->timer_fd);
 
 err_free_task_f:
-	free(new_task->task_f);
+	if (new_task->task_f)
+		free(new_task->task_f);
 
 err_free_new_task:
-	free(new_task);
-
 	if (task_info->f_deinit)
-		task_info->f_deinit();
+		task_info->f_deinit(new_task->priv);
+
+	free(new_task);
 
 	return false;
 }
@@ -266,9 +286,9 @@ err_free_new_task:
  * @brief 从监听事件中移除定时器任务
  * 
  * @param handle epoll句柄
- * @param task_info 任务指针
- * @return true 
- * @return false 
+ * @param task_info 任务指针（需要匹配 f_entry）
+ * @return true 成功
+ * @return false 失败
  */
 bool epoll_timer_remove_task(et_handle handle, const struct epoll_timer_task *task_info)
 {
@@ -277,8 +297,8 @@ bool epoll_timer_remove_task(et_handle handle, const struct epoll_timer_task *ta
 		return false;
 	}
 
-	timer_task_entry f_entry = task_info->f_entry;
-	if (!f_entry) {
+	// 仅当 f_entry 非 NULL 时才能移除任务
+	if (task_info->f_entry == NULL) {
 		LOG_E("f_entry is NULL in epoll_timer_remove_task. Unable to identify the task.");
 		return false;
 	}
@@ -286,17 +306,20 @@ bool epoll_timer_remove_task(et_handle handle, const struct epoll_timer_task *ta
 	pthread_mutex_lock(&handle->lock);
 	struct timer_task *task = handle->task_list;
 	while (task) {
-		if (task->task_f->f_entry == f_entry) {
+		if (task->task_f && task->task_f->f_entry == task_info->f_entry) {
 			// 移除
-			if (epoll_ctl(handle->epoll_fd, EPOLL_CTL_DEL, task->timer_fd, NULL) < 0) {
-				LOG_E("Failed to remove timerfd from epoll: %s", strerror(errno));
+			if (task->timer_fd >= 0) {
+				if (epoll_ctl(handle->epoll_fd, EPOLL_CTL_DEL, task->timer_fd, NULL) < 0) {
+					LOG_E("Failed to remove timerfd from epoll: %s", strerror(errno));
+				}
+				close(task->timer_fd);
 			}
 
-			// 关闭定时器
-			close(task->timer_fd);
-			if (task->task_f->f_deinit) // 释放资源
-				task->task_f->f_deinit();
+			// 调用去初始化函数
+			if (task->task_f->f_deinit)
+				task->task_f->f_deinit(task->priv);
 
+			// 移除任务链表
 			if (task->prev)
 				task->prev->next = task->next;
 			else
@@ -305,10 +328,10 @@ bool epoll_timer_remove_task(et_handle handle, const struct epoll_timer_task *ta
 			if (task->next)
 				task->next->prev = task->prev;
 
+			// 释放资源
 			free(task->task_f);
 			free(task);
 
-			LOG_I("Removed a timer task.");
 			pthread_mutex_unlock(&handle->lock);
 			return true;
 		}
@@ -324,12 +347,12 @@ bool epoll_timer_remove_task(et_handle handle, const struct epoll_timer_task *ta
  * @brief 停止事件监听
  * 
  * @param handle epoll句柄
- * @return true 
- * @return false 
+ * @return true 成功
+ * @return false 失败
  */
 bool epoll_timer_stop(et_handle handle)
 {
-	if (!handle) {
+	if (!handle || handle->stop_eventfd < 0) {
 		LOG_E("Invalid handle in epoll_timer_stop.");
 		return false;
 	}
@@ -345,23 +368,24 @@ bool epoll_timer_stop(et_handle handle)
 }
 
 /**
- * @brief 轮训事件监听
+ * @brief 轮询事件监听
  * 
  * @param handle epoll句柄
- * @return int 0:正常退出 1:错误退出
+ * @return int 0:正常退出, 1:错误退出
  */
 int epoll_timer_run(et_handle handle)
 {
 	if (!handle) {
 		LOG_E("Invalid handle in epoll_timer_run.");
-		return -1;
+		return 1;
 	}
 
+	// 已经运行直接返回
 	pthread_mutex_lock(&handle->lock);
 	if (handle->running) {
 		pthread_mutex_unlock(&handle->lock);
 		LOG_E("epoll_timer_run is already running.");
-		return -1;
+		return 1;
 	}
 	handle->running = true;
 	pthread_mutex_unlock(&handle->lock);
@@ -369,16 +393,24 @@ int epoll_timer_run(et_handle handle)
 	struct epoll_event events[MAX_EVENTS]; // 最大监听事件
 
 	while (1) {
+		// 等待事件触发
 		int nfds = epoll_wait(handle->epoll_fd, events, MAX_EVENTS, -1);
 		if (nfds < 0) {
+			// 异常唤醒
 			if (errno == EINTR)
 				continue;
 			LOG_E("epoll_wait failed: %s", strerror(errno));
 			break;
 		}
 
+		if (nfds == 0) {
+			// 理论上不会发生，因为超时为-1
+			LOG_W("epoll_wait returned 0, unexpected with infinite timeout.");
+			continue;
+		}
+
 		for (int i = 0; i < nfds; i++) {
-			// 停止监听
+			// 收到停止事件
 			if (events[i].data.fd == handle->stop_eventfd) {
 				uint64_t buf;
 				ssize_t s = read(handle->stop_eventfd, &buf, sizeof(buf));
@@ -389,10 +421,10 @@ int epoll_timer_run(et_handle handle)
 				pthread_mutex_lock(&handle->lock);
 				handle->running = false;
 				pthread_mutex_unlock(&handle->lock);
-				return 0;
+				return 0; // 0 正常返回
 			}
 
-			// 可以读
+			// 可以读事件
 			if (events[i].events & EPOLLIN) {
 				struct timer_task *task = (struct timer_task *)events[i].data.ptr;
 				if (!task) {
@@ -407,8 +439,8 @@ int epoll_timer_run(et_handle handle)
 					continue;
 				}
 
-				if (task->task_f->f_entry)
-					task->task_f->f_entry();
+				if (task->task_f && task->task_f->f_entry)
+					task->task_f->f_entry(task->priv); // 执行任务
 			}
 		}
 	}
@@ -416,5 +448,5 @@ int epoll_timer_run(et_handle handle)
 	pthread_mutex_lock(&handle->lock);
 	handle->running = false;
 	pthread_mutex_unlock(&handle->lock);
-	return -1;
+	return 1; // 1:错误退出
 }

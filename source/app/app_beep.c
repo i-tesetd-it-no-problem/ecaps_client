@@ -29,7 +29,10 @@
 
 #include "app/app_beep.h"
 #include "app/app_pwm.h"
+
 #include "utils/logger.h"
+
+#include <stdlib.h>
 #include <stdbool.h>
 #include <pthread.h>
 
@@ -38,134 +41,163 @@
 #define CALC_STEP (10)	 // 步长 10
 
 struct app_beep {
-	size_t period;		   // 周期(控制音调)
-	size_t duty_cycle;	   // 占空比(控制强度)
+	size_t period;		   // 周期
+	size_t duty_cycle;	   // 占空比
 	pthread_mutex_t mutex; // 互斥锁
-	bool inited;		   // 初始化标志
 };
 
-// 实例化
-struct app_beep beep = {
-	.mutex = PTHREAD_MUTEX_INITIALIZER,
-	.period = 1000,	   // 默认周期
-	.duty_cycle = 500, // 默认占空值
-	.inited = false,
-};
+static struct app_beep *beep = NULL;
 
 /**
- * @brief 初始化蜂鸣器
+ * @brief 初始化
  * 
- * @return true 
- * @return false 
+ * @param p_priv 私有数据二级指针
+ * @return true 初始化成功
+ * @return false 初始化失败
  */
-bool app_beep_init(void)
+bool app_beep_init(void **p_priv)
 {
-	static bool inited = false;
-	if (inited)
-		return inited;
-	inited = true;
-
 	bool ret = false;
+
+	// 实例化
+	struct app_beep *p_beep = malloc(sizeof(struct app_beep));
+	if (!p_beep) {
+		LOG_E("Malloc vep failed");
+		return false;
+	}
+
+	int res = pthread_mutex_init(&p_beep->mutex, NULL);
+	if (ret != 0) {
+		LOG_E("Init mutex failed");
+		goto err_free_beep;
+	}
+	p_beep->period = 1000;
+	p_beep->duty_cycle = 500;
 
 	ret = export_pwm(PWM_CHIP, PWM_CHANNEL);
 	if (!ret) {
 		LOG_E("create beep failed");
-		return ret;
+		goto err_free_mutex;
 	}
 
-	pthread_mutex_lock(&beep.mutex);
+	pthread_mutex_lock(&p_beep->mutex);
 
-	set_pwm_period(PWM_CHIP, PWM_CHANNEL, beep.period);			// 设置周期(音调)
-	set_pwm_duty_cycle(PWM_CHIP, PWM_CHANNEL, beep.duty_cycle); // 设置占空比(强度)
+	set_pwm_period(PWM_CHIP, PWM_CHANNEL, p_beep->period);		   // 设置周期(音调)
+	set_pwm_duty_cycle(PWM_CHIP, PWM_CHANNEL, p_beep->duty_cycle); // 设置占空比(强度)
 
-	pthread_mutex_unlock(&beep.mutex);
+	pthread_mutex_unlock(&p_beep->mutex);
 
-	beep.inited = true;
+	*p_priv = p_beep;
+	beep = p_beep;
 
 	return true;
+
+err_free_mutex:
+	pthread_mutex_destroy(&beep->mutex);
+
+err_free_beep:
+	free(beep);
+
+	return false;
 }
 
 /**
- * @brief 开启/关闭蜂鸣器
+ * @brief 开启/关闭
  * 
  * @param enable 
  */
 void beep_control(bool enable)
 {
-	pthread_mutex_lock(&beep.mutex);
+	pthread_mutex_lock(&beep->mutex);
 
-	if (!beep.inited)
+	if (!beep)
 		return;
 
 	enable_pwm(PWM_CHIP, PWM_CHANNEL, enable);
 
-	pthread_mutex_unlock(&beep.mutex);
+	pthread_mutex_unlock(&beep->mutex);
 }
 
 /**
- * @brief 提升音量(增加响度)
+ * @brief 提高占空比
  * 
  */
-void app_beep_higher(void)
+void app_beep_add_duty(size_t duty)
 {
-	pthread_mutex_lock(&beep.mutex);
-
-	if (!beep.inited)
+	if (!beep)
 		return;
 
-	beep.duty_cycle += CALC_STEP;
-	set_pwm_duty_cycle(PWM_CHIP, PWM_CHANNEL, beep.duty_cycle);
+	pthread_mutex_lock(&beep->mutex);
 
-	pthread_mutex_unlock(&beep.mutex);
+	if (MAX_BEEP_DUTY - duty < beep->duty_cycle)
+		beep->duty_cycle = MAX_BEEP_DUTY;
+	else
+		beep->duty_cycle += duty;
+
+	set_pwm_duty_cycle(PWM_CHIP, PWM_CHANNEL, beep->duty_cycle);
+
+	pthread_mutex_unlock(&beep->mutex);
 }
 
 /**
- * @brief 降低音量(减小响度)
+ * @brief 减少占空比
  * 
  */
-void app_beep_lower(void)
+void app_beep_sub_duty(size_t duty)
 {
-	pthread_mutex_lock(&beep.mutex);
-
-	if (!beep.inited)
+	if (!beep)
 		return;
 
-	beep.duty_cycle -= CALC_STEP;
-	set_pwm_duty_cycle(PWM_CHIP, PWM_CHANNEL, beep.duty_cycle);
+	pthread_mutex_lock(&beep->mutex);
 
-	pthread_mutex_unlock(&beep.mutex);
+	if (beep->duty_cycle < duty)
+		beep->duty_cycle = 0;
+	else
+		beep->duty_cycle -= duty;
+
+	set_pwm_duty_cycle(PWM_CHIP, PWM_CHANNEL, beep->duty_cycle);
+
+	pthread_mutex_unlock(&beep->mutex);
 }
 
 /**
- * @brief 提升音调(增加频率)
+ * @brief 提高周期
  * 
  */
-void app_beep_higher_tone(void)
+void app_beep_add_period(size_t period)
 {
-	pthread_mutex_lock(&beep.mutex);
-
-	if (!beep.inited)
+	if (!beep)
 		return;
 
-	beep.period += 100;
-	set_pwm_period(PWM_CHIP, PWM_CHANNEL, beep.period);
+	pthread_mutex_lock(&beep->mutex);
 
-	pthread_mutex_unlock(&beep.mutex);
+	if (MAX_BEEP_DUTY - period < beep->period)
+		beep->period = MAX_BEEP_PERIOD;
+	else
+		beep->period += period;
+
+	set_pwm_period(PWM_CHIP, PWM_CHANNEL, beep->period);
+
+	pthread_mutex_unlock(&beep->mutex);
 }
 
 /**
- * @brief 降低音调(降低频率)
+ * @brief 减少周期
  * 
  */
-void app_beep_lower_tone(void)
+void app_beep_sub_period(size_t period)
 {
-	pthread_mutex_lock(&beep.mutex);
-
-	if (!beep.inited)
+	if (!beep)
 		return;
 
-	beep.period -= 100;
-	set_pwm_period(PWM_CHIP, PWM_CHANNEL, beep.period);
+	pthread_mutex_lock(&beep->mutex);
 
-	pthread_mutex_unlock(&beep.mutex);
+	if (beep->period < period)
+		beep->period = 0;
+	else
+		beep->period -= period;
+
+	set_pwm_period(PWM_CHIP, PWM_CHANNEL, beep->period);
+
+	pthread_mutex_unlock(&beep->mutex);
 }

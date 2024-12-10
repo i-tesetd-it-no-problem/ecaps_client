@@ -77,7 +77,7 @@ void maxim_heart_rate_and_oxygen_saturation(unsigned int *pun_ir_buffer, int n_i
 	}
 	n_th1 = n_th1 / (BUFFER_SIZE - HAMMING_SIZE);
 
-	// 峰值位置实际上是原始信号中最尖锐位置的索引，因为我们翻转了信号
+	// 峰值位置实际上是原始信号中最尖锐位置的索引,因为我们翻转了信号
 	maxim_find_peaks(an_dx_peak_locs, &n_npks, an_dx, BUFFER_SIZE - HAMMING_SIZE, n_th1, 8, 5);
 
 	n_peak_interval_sum = 0;
@@ -95,7 +95,7 @@ void maxim_heart_rate_and_oxygen_saturation(unsigned int *pun_ir_buffer, int n_i
 	for (k = 0; k < n_npks; k++)
 		an_ir_valley_locs[k] = an_dx_peak_locs[k] + HAMMING_SIZE / 2;
 
-	// RED（=y）和IR（=X）的原始值
+	// RED(=y)和IR(=X)的原始值
 	// 需要评估IR和RED PPG的直流和交流值
 	for (k = 0; k < n_ir_buffer_length; k++) {
 		an_x[k] = pun_ir_buffer[k];
@@ -122,7 +122,7 @@ void maxim_heart_rate_and_oxygen_saturation(unsigned int *pun_ir_buffer, int n_i
 		}
 	}
 	if (n_exact_ir_valley_locs_count < 2) {
-		*pn_spo2 = -999; // 由于信号比例超出范围，不使用SPO2
+		*pn_spo2 = -999; // 由于信号比例超出范围,不使用SPO2
 		*pch_spo2_valid = 0;
 		return;
 	}
@@ -133,7 +133,7 @@ void maxim_heart_rate_and_oxygen_saturation(unsigned int *pun_ir_buffer, int n_i
 		an_y[k] = (an_y[k] + an_y[k + 1] + an_y[k + 2] + an_y[k + 3]) / 4;
 	}
 
-	// 使用an_exact_ir_valley_locs，查找IR-Red的直流和交流分量以进行SPO2校准比例
+	// 使用an_exact_ir_valley_locs,查找IR-Red的直流和交流分量以进行SPO2校准比例
 	// 在两个谷值位置之间查找原始IR * RED的AC/DC最大值
 	n_ratio_average = 0;
 	n_i_ratio_count = 0;
@@ -142,7 +142,7 @@ void maxim_heart_rate_and_oxygen_saturation(unsigned int *pun_ir_buffer, int n_i
 		an_ratio[k] = 0;
 	for (k = 0; k < n_exact_ir_valley_locs_count; k++) {
 		if (an_exact_ir_valley_locs[k] > BUFFER_SIZE) {
-			*pn_spo2 = -999; // 由于谷值位置超出范围，不使用SPO2
+			*pn_spo2 = -999; // 由于谷值位置超出范围,不使用SPO2
 			*pch_spo2_valid = 0;
 			return;
 		}
@@ -184,7 +184,7 @@ void maxim_heart_rate_and_oxygen_saturation(unsigned int *pun_ir_buffer, int n_i
 		}
 	}
 
-	// 选择中位数值，因为PPG信号可能因心跳而变化
+	// 选择中位数值,因为PPG信号可能因心跳而变化
 	maxim_sort_ascend(an_ratio, n_i_ratio_count);
 	n_middle_idx = n_i_ratio_count / 2;
 
@@ -222,7 +222,7 @@ void maxim_heart_rate_and_oxygen_saturation(unsigned int *pun_ir_buffer, int n_i
 		un_ir_mean += pun_ir_buffer[k];
 	un_ir_mean = un_ir_mean / n_ir_buffer_length;
 
-	// 移除直流并反转信号，以便使用峰值检测器作为谷值检测器
+	// 移除直流并反转信号,以便使用峰值检测器作为谷值检测器
 	for (k = 0; k < n_ir_buffer_length; k++)
 		an_x[k] = -1 * (pun_ir_buffer[k] - un_ir_mean);
 
@@ -244,7 +244,7 @@ void maxim_heart_rate_and_oxygen_saturation(unsigned int *pun_ir_buffer, int n_i
 
 	for (k = 0; k < 15; k++)
 		an_ir_valley_locs[k] = 0;
-	// 由于我们翻转了信号，使用峰值检测器作为谷值检测器
+	// 由于我们翻转了信号,使用峰值检测器作为谷值检测器
 	maxim_find_peaks(an_ir_valley_locs, &n_npks, an_x, n_ir_buffer_length, n_th1, 4, 15);
 
 	n_peak_interval_sum = 0;
@@ -259,7 +259,7 @@ void maxim_heart_rate_and_oxygen_saturation(unsigned int *pun_ir_buffer, int n_i
 		*pch_hr_valid = 0;
 	}
 
-	// 再次加载原始值以进行SPO2计算：RED（=y）和IR（=X）
+	// 再次加载原始值以进行SPO2计算：RED(=y)和IR(=X)
 	for (k = 0; k < n_ir_buffer_length; k++) {
 		an_x[k] = pun_ir_buffer[k];
 		an_y[k] = pun_red_buffer[k];
@@ -268,7 +268,7 @@ void maxim_heart_rate_and_oxygen_saturation(unsigned int *pun_ir_buffer, int n_i
 	// 查找an_ir_valley_locs附近的精确最小值
 	n_exact_ir_valley_locs_count = n_npks;
 
-	// 使用exact_ir_valley_locs，查找IR-Red的直流和交流分量以进行SPO2校准an_ratio
+	// 使用exact_ir_valley_locs,查找IR-Red的直流和交流分量以进行SPO2校准an_ratio
 	// 查找原始信号的AC/DC最大值
 	n_ratio_average = 0;
 	n_i_ratio_count = 0;
@@ -276,7 +276,7 @@ void maxim_heart_rate_and_oxygen_saturation(unsigned int *pun_ir_buffer, int n_i
 		an_ratio[k] = 0;
 	for (k = 0; k < n_exact_ir_valley_locs_count; k++) {
 		if (an_ir_valley_locs[k] > n_ir_buffer_length) {
-			*pn_spo2 = -999; // 由于谷值位置超出范围，不使用SPO2
+			*pn_spo2 = -999; // 由于谷值位置超出范围,不使用SPO2
 			*pch_spo2_valid = 0;
 			return;
 		}
@@ -318,7 +318,7 @@ void maxim_heart_rate_and_oxygen_saturation(unsigned int *pun_ir_buffer, int n_i
 		}
 	}
 
-	// 选择中位数值，因为PPG信号可能因心跳而变化
+	// 选择中位数值,因为PPG信号可能因心跳而变化
 	maxim_sort_ascend(an_ratio, n_i_ratio_count);
 	n_middle_idx = n_i_ratio_count / 2;
 
@@ -360,7 +360,7 @@ void maxim_peaks_above_min_height(
 				n_width++;
 			if (pn_x[i] > pn_x[i + n_width] && (*pn_npks) < 15) {
 				pn_locs[(*pn_npks)++] = i;
-				// 对于平坦的峰值，峰值位置是左边缘
+				// 对于平坦的峰值,峰值位置是左边缘
 				i += n_width + 1;
 			} else
 				i += n_width;

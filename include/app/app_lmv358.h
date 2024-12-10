@@ -1,9 +1,9 @@
 /**
- * @file app_fans.h
+ * @file app_vol_cur.h
  * @author wenshuyu (wsy2161826815@163.com)
- * @brief 小风扇
+ * @brief 扩展版工作电压电流采集
  * @version 1.0
- * @date 2024-12-03
+ * @date 2024-12-04
  * 
  * @copyright Copyright (c) 2024
  * 
@@ -27,48 +27,34 @@
  * 
  */
 
-#ifndef _APP_FANS_
-#define _APP_FANS_
+#ifndef _APP_LMV358__H
+#define _APP_LMV358__H
 
 #include <stdbool.h>
 
-/**
- * @brief 初始化风扇
- * 
- * @return true 
- * @return false 
- */
-bool app_fan_init(void);
+#define APP_COLL_I_V_PERIOD (500U)
 
 /**
- * @brief 开启/关闭风扇
+ * @brief 初始化采集模块
  * 
- * @param enable 
+ * @param p_priv 私有数据二级指针
+ * @return true 初始化成功
+ * @return false 初始化失败
  */
-void fans_control(bool enable);
+bool app_lmv358_init(void **p_priv);
 
 /**
- * @brief 提升风扇风速(增加频率)
+ * @brief 去初始化采集模块
  * 
+ * @param priv 私有数据指针
  */
-void app_fans_faster(void);
+void app_lmv358_deinit(void *priv);
 
 /**
- * @brief 降低风扇风速(降低频率)
+ * @brief 采集任务
  * 
+ * @param priv 私有数据指针
  */
-void app_fans_slower(void);
+void app_lmv358_task(void *priv);
 
-/**
- * @brief 提升风扇强度(增加占空比)
- * 
- */
-void app_fans_stronger(void);
-
-/**
- * @brief 降低风扇强度(减少占空比)
- * 
- */
-void app_fans_weaker(void);
-
-#endif /* _APP_FANS_ */
+#endif /* _APP_LMV358__H */

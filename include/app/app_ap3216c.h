@@ -7,42 +7,26 @@
 #define APP_AP3216C_TASK_PEIOD (100U)
 
 /**
- * @brief 初始化温湿度采集模块
+ * @brief 初始化采集模块
  * 
- * @return bool
+ * @param p_priv 二级私有数据指针
+ * @return true 初始化成功
+ * @return false 初始化失败
  */
-bool app_ap3216c_init(void);
+bool app_ap3216c_init(void **p_priv);
 
 /**
- * @brief 关闭温湿度采集模块
+ * @brief 去初始化采集模块
+ * 
+ * @param priv 私有数据指针
  */
-void app_ap3216c_deinit(void);
+void app_ap3216c_deinit(void *priv);
 
 /**
- * @brief 采集温湿度数据
+ * @brief 采集任务
  * 
+ * @param priv 
  */
-void app_ap3216c_collect(void);
-
-/**
- * @brief 红外线传感器值
- * 
- * @return
- */
-uint16_t get_ir(void);
-
-/**
- * @brief 环境光传感器值
- * 
- * @return
- */
-uint16_t get_ials(void);
-
-/**
- * @brief 接近传感器值
- * 
- * @return
- */
-uint16_t get_ps(void);
+void app_ap3216c_task(void *priv);
 
 #endif /* _APP_AP3216C_H */

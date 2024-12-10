@@ -31,10 +31,10 @@
 #define URL_PARSER_H
 
 typedef struct {
-    char *protocol;  // 协议，例如 "http" 或 "https"
+    char *protocol;  // 协议,例如 "http" 或 "https"
     char *host;      // 主机名或IP地址
     char *port;      // 端口号字符串
-    char *route;     // 路径，包含前导'/'
+    char *route;     // 路径,包含前导'/'
 } url_info_t;
 
 // URL解析函数

@@ -1,11 +1,11 @@
 
 #include <fcntl.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <stdbool.h>
 
 #include "app/app_led.h"
-#include "utils/epoll_timer.h"
 #include "utils/logger.h"
 #include "utils/qfsm.h"
 
@@ -51,16 +51,14 @@ struct led_task {
 	size_t state_period;	  // 当前状态的闪烁周期
 };
 
-// LED任务实例
-static struct led_task led_instance = {
-	.cur_state = LED_STATE_SCROLL,
-};
+// 全局示例
+static struct led_task *led_handle = NULL;
 
-// 状态函数声明
+// 状态函数
 static qstate app_led_normal(qfsm_t *me, qevent_t const *ev); // 周期闪烁状态
 static qstate app_led_scroll(qfsm_t *me, qevent_t const *ev); // 跑马灯状态
 
-// 所有状态处理函数
+// 所有状态函数
 static qstate_handler _all_state[LED_STATE_MAX] = {
 	[LED_STATE_NORMAL] = app_led_normal,
 	[LED_STATE_SCROLL] = app_led_scroll,
@@ -167,13 +165,26 @@ static qstate app_led_scroll(qfsm_t *me, qevent_t const *e)
 }
 
 /**
- * @brief 初始化LED模块
+ * @brief 初始化LED
  * 
- * @return bool
+ * @param p_priv 私有数据二级指针
+ * @return true 初始化成功
+ * @return false 初始化失败
  */
-bool app_led_init(void)
+bool app_led_init(void **p_priv)
 {
+	if (!p_priv)
+		return false;
+
 	uint8_t err = 0;
+
+	// LED任务实例
+	struct led_task *led_ins = malloc(sizeof(struct led_task));
+	if (!led_ins) {
+		LOG_E("Malloc led instance failed");
+		return false;
+	}
+	led_ins->cur_state = LED_STATE_SCROLL;
 
 	// 打开所有LED设备
 	for (enum led_idx i = LED_IDX_1; i < LED_ID_MAX; i++) {
@@ -193,16 +204,24 @@ bool app_led_init(void)
 
 	// 初始化状态机为当前状态
 	qevent_t ev = { .sig = Q_EMPTY_SIG };
-	qfsm_init(&led_instance.fsm, _all_state[led_instance.cur_state], &ev);
+	qfsm_init(&led_ins->fsm, _all_state[led_ins->cur_state], &ev);
+
+	*p_priv = led_ins; // 保存指针
+	led_handle = led_ins;
 
 	return (err == 0) ? true : false;
 }
 
 /**
- * @brief 关闭LED模块
+ * @brief 去初始化LED
+ * 
+ * @param priv 私有数据指针
  */
-void app_led_deinit(void)
+void app_led_deinit(void *priv)
 {
+	if (!priv)
+		return;
+
 	for (enum led_idx i = LED_IDX_1; i < LED_ID_MAX; i++) {
 		if (_led_dev[i].fd >= 0) {
 			close(_led_dev[i].fd);
@@ -210,17 +229,22 @@ void app_led_deinit(void)
 			LOG_I("Closed LED device: %s", _led_dev[i].dev_path);
 		}
 	}
+
+	struct led_task *led_ins = priv;
+	free(led_ins);
 }
 
 /**
- * @brief 处理LED任务
+ * @brief LED任务
  * 
- * 此函数应在主事件循环中由对应的定时器触发时调用。
+ * @param priv 私有数据指针
  */
-void app_led_process(void)
+void app_led_task(void *priv)
 {
+	struct led_task *led_ins = priv;
+
 	qevent_t ev = { .sig = Q_APP_EVENT_TIMEOUT };
-	qfsm_dispatch(&led_instance.fsm, &ev);
+	qfsm_dispatch(&led_ins->fsm, &ev);
 }
 
 /**
@@ -230,13 +254,13 @@ void app_led_process(void)
  */
 void led_chg_state(enum led_state state)
 {
-	if (state >= LED_STATE_MAX || state < LED_STATE_NORMAL)
+	if (state >= LED_STATE_MAX || state < LED_STATE_NORMAL || !led_handle)
 		return;
 
-	led_instance.cur_state = state;
+	led_handle->cur_state = state;
 
 	qevent_t ev = { .sig = CHANGE_SIG };
-	qfsm_dispatch(&led_instance.fsm, &ev);
+	qfsm_dispatch(&led_handle->fsm, &ev);
 
 	LOG_I("LED state changed to %d", state);
 }

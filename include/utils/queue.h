@@ -1,7 +1,7 @@
 /**
  * @file queue.h
  * @author wenshuyu (wsy2161826815@163.com)
- * @brief 循环队列组件
+ * @brief 循环队列组件,线程安全
  * @version 1.0
  * @date 2024-08-12
  * 
@@ -41,7 +41,7 @@ struct queue_info {
     size_t buf_size;       /* 缓冲区容量(单位数) */
     size_t rd;             /* 读索引 */
     size_t wr;             /* 写索引 */
-    pthread_mutex_t mutex; /* 互斥锁，用于线程安全 */
+    pthread_mutex_t mutex; /* 互斥锁,用于线程安全 */
 };
 
 /**
@@ -51,7 +51,7 @@ struct queue_info {
  * @param unit_bytes 每个单元的字节数
  * @param buf        指向预分配缓冲区的指针
  * @param count      缓冲区容量(单位数)
- * @return true 成功，false 失败
+ * @return true 成功,false 失败
  */
 bool queue_init(struct queue_info *q, size_t unit_bytes, uint8_t *buf, size_t count);
 
@@ -90,7 +90,7 @@ size_t queue_add(struct queue_info *q, const uint8_t *data, size_t units);
 size_t queue_get(struct queue_info *q, uint8_t *data, size_t units);
 
 /**
- * @brief 查看队列中的数据，但不移除
+ * @brief 查看队列中的数据,但不移除
  * 
  * @param q     指向队列实例的指针
  * @param data  指向存储查看数据的缓冲区的指针
@@ -103,7 +103,7 @@ size_t queue_peek(const struct queue_info *q, uint8_t *data, size_t units);
  * @brief 判断队列是否为空
  * 
  * @param q 指向队列实例的指针
- * @return true 如果队列为空，false 否则
+ * @return true 如果队列为空,false 否则
  */
 bool is_queue_empty(const struct queue_info *q);
 
@@ -111,7 +111,7 @@ bool is_queue_empty(const struct queue_info *q);
  * @brief 判断队列是否已满
  * 
  * @param q 指向队列实例的指针
- * @return true 如果队列已满，false 否则
+ * @return true 如果队列已满,false 否则
  */
 bool is_queue_full(const struct queue_info *q);
 
