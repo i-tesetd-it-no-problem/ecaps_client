@@ -1,7 +1,7 @@
 /**
  * @file app_vol_cur.c
  * @author wenshuyu (wsy2161826815@163.com)
- * @brief 扩展版工作电压电流采集
+ * @brief 扩展版工作电压/电流采集
  * @version 1.0
  * @date 2024-12-04
  * 
@@ -34,12 +34,13 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include <errno.h>
 #include <pthread.h>
 
-#include "app/app_lmv358.h"
 #include "json/sensor_json.h"
+
 #include "utils/logger.h"
+
+#include "app/app_lmv358.h"
 
 #define R50 (1000.0)
 #define R49 (100 * 1000.0)
@@ -78,7 +79,7 @@ static int read_scale(struct lmv358_task *lmv358)
 	memset(buf, 0, sizeof(buf));
 	ret = read(lmv358->fd_scale, buf, sizeof(buf) - 1);
 	if (ret < 0) {
-		LOG_E("read scale failed: %s", strerror(errno));
+		LOG_E("read scale failed");
 		return -1;
 	}
 	char *endptr;
@@ -89,7 +90,7 @@ static int read_scale(struct lmv358_task *lmv358)
 	}
 	lmv358->scale = scale;
 	if (lseek(lmv358->fd_scale, 0, SEEK_SET) < 0) {
-		LOG_E("lseek failed for scale: %s", strerror(errno));
+		LOG_E("lseek failed for scale");
 		return -1;
 	}
 
@@ -114,7 +115,7 @@ static int collect_voltage(struct lmv358_task *lmv358)
 	memset(buf, 0, sizeof(buf));
 	ret = read(lmv358->fd_raw_v, buf, sizeof(buf) - 1);
 	if (ret < 0) {
-		LOG_E("read raw voltage failed: %s", strerror(errno));
+		LOG_E("read raw voltage failed");
 		return -1;
 	}
 	char *endptr;
@@ -127,7 +128,7 @@ static int collect_voltage(struct lmv358_task *lmv358)
 	float raw_vol = raw_value * lmv358->scale; // 采集电压 mV
 
 	if (lseek(lmv358->fd_raw_v, 0, SEEK_SET) < 0) {
-		LOG_E("lseek failed for raw voltage: %s", strerror(errno));
+		LOG_E("lseek failed for raw voltage");
 		return -1;
 	}
 
@@ -156,7 +157,7 @@ static int collect_current(struct lmv358_task *lmv358)
 	memset(buf, 0, sizeof(buf));
 	ret = read(lmv358->fd_raw_i, buf, sizeof(buf) - 1);
 	if (ret < 0) {
-		LOG_E("read raw current failed: %s", strerror(errno));
+		LOG_E("read raw current failed");
 		return -1;
 	}
 	char *endptr;
@@ -171,7 +172,7 @@ static int collect_current(struct lmv358_task *lmv358)
 	float Iin = Vin / R54;						 // 电流
 
 	if (lseek(lmv358->fd_raw_i, 0, SEEK_SET) < 0) {
-		LOG_E("lseek failed for raw current: %s", strerror(errno));
+		LOG_E("lseek failed for raw current");
 		return -1;
 	}
 

@@ -1,3 +1,31 @@
+/**
+ * @file app_led.c
+ * @author wenshuyu (wsy2161826815@163.com)
+ * @brief LED任务
+ * @version 1.0
+ * @date 2024-12-11
+ * 
+ * @copyright Copyright (c) 2024
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ * 
+ */
 
 #include <fcntl.h>
 #include <stdint.h>
@@ -5,9 +33,10 @@
 #include <unistd.h>
 #include <stdbool.h>
 
-#include "app/app_led.h"
 #include "utils/logger.h"
 #include "utils/qfsm.h"
+
+#include "app/app_led.h"
 
 // 单个LED设备
 struct led_device {
@@ -51,8 +80,8 @@ struct led_task {
 	size_t state_period;	  // 当前状态的闪烁周期
 };
 
-// 全局示例
-static struct led_task *led_handle = NULL;
+// 全局实例
+static struct led_task *leds_dev = NULL;
 
 // 状态函数
 static qstate app_led_normal(qfsm_t *me, qevent_t const *ev); // 周期闪烁状态
@@ -98,7 +127,6 @@ static qstate app_led_normal(qfsm_t *me, qevent_t const *e)
 		break;
 
 	case CHANGE_SIG:
-		LOG_I("Changing LED state.");
 		return Q_TRAN(_all_state[p->cur_state]); // 状态转移
 
 	default:
@@ -154,7 +182,6 @@ static qstate app_led_scroll(qfsm_t *me, qevent_t const *e)
 		break;
 
 	case CHANGE_SIG:
-		LOG_I("Changing LED state.");
 		return Q_TRAN(_all_state[p->cur_state]); // 状态转移
 
 	default:
@@ -197,9 +224,7 @@ bool app_led_init(void **p_priv)
 		_led_dev[i].fd = fd;
 	}
 
-	if (!err)
-		LOG_I("All LEDs initialized successfully.");
-	else
+	if (err)
 		LOG_E("Failed to initialize %d LEDs.", err);
 
 	// 初始化状态机为当前状态
@@ -207,7 +232,7 @@ bool app_led_init(void **p_priv)
 	qfsm_init(&led_ins->fsm, _all_state[led_ins->cur_state], &ev);
 
 	*p_priv = led_ins; // 保存指针
-	led_handle = led_ins;
+	leds_dev = led_ins;
 
 	return (err == 0) ? true : false;
 }
@@ -226,7 +251,6 @@ void app_led_deinit(void *priv)
 		if (_led_dev[i].fd >= 0) {
 			close(_led_dev[i].fd);
 			_led_dev[i].fd = -1;
-			LOG_I("Closed LED device: %s", _led_dev[i].dev_path);
 		}
 	}
 
@@ -254,13 +278,11 @@ void app_led_task(void *priv)
  */
 void led_chg_state(enum led_state state)
 {
-	if (state >= LED_STATE_MAX || state < LED_STATE_NORMAL || !led_handle)
+	if (state >= LED_STATE_MAX || state < LED_STATE_NORMAL || !leds_dev)
 		return;
 
-	led_handle->cur_state = state;
+	leds_dev->cur_state = state;
 
 	qevent_t ev = { .sig = CHANGE_SIG };
-	qfsm_dispatch(&led_handle->fsm, &ev);
-
-	LOG_I("LED state changed to %d", state);
+	qfsm_dispatch(&leds_dev->fsm, &ev);
 }

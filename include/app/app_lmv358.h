@@ -1,7 +1,7 @@
 /**
  * @file app_vol_cur.h
  * @author wenshuyu (wsy2161826815@163.com)
- * @brief 扩展版工作电压电流采集
+ * @brief 扩展版工作电压/电流采集
  * @version 1.0
  * @date 2024-12-04
  * 

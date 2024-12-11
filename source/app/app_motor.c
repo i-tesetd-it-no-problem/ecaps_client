@@ -1,7 +1,7 @@
 /**
  * @file app_motor.c
  * @author wenshuyu (wsy2161826815@163.com)
- * @brief 蜂鸣器
+ * @brief 振动马达
  * @version 1.0
  * @date 2024-12-03
  * 
@@ -27,14 +27,14 @@
  * 
  */
 
-#include "app/app_motor.h"
-#include "app/app_pwm.h"
-
-#include "utils/logger.h"
-
 #include <stdlib.h>
 #include <stdbool.h>
 #include <pthread.h>
+
+#include "utils/logger.h"
+
+#include "app/app_pwm.h"
+#include "app/app_motor.h"
 
 #define PWM_CHIP (8U)	 // PWM 号
 #define PWM_CHANNEL (0U) // PWM 通道 1
@@ -82,7 +82,7 @@ bool app_motor_init(void **p_priv)
 
 	pthread_mutex_lock(&p_motor->mutex);
 
-	set_pwm_period(PWM_CHIP, PWM_CHANNEL, p_motor->period);		   // 设置周期(音调)
+	set_pwm_period(PWM_CHIP, PWM_CHANNEL, p_motor->period);			// 设置周期(音调)
 	set_pwm_duty_cycle(PWM_CHIP, PWM_CHANNEL, p_motor->duty_cycle); // 设置占空比(强度)
 
 	pthread_mutex_unlock(&p_motor->mutex);

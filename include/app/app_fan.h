@@ -1,7 +1,7 @@
 /**
  * @file app_fan.h
  * @author wenshuyu (wsy2161826815@163.com)
- * @brief 峰鸣器
+ * @brief 小风扇
  * @version 1.0
  * @date 2024-12-03
  * 

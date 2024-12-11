@@ -1,3 +1,32 @@
+/**
+ * @file app_max30102.c
+ * @author wenshuyu (wsy2161826815@163.com)
+ * @brief 心率血氧采集模块
+ * @version 1.0
+ * @date 2024-12-11
+ * 
+ * @copyright Copyright (c) 2024
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ * 
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -10,28 +39,30 @@
 #include <endian.h>
 #include <stdbool.h>
 #include <pthread.h>
+
 #include "json/sensor_json.h"
 
 #include "utils/logger.h"
+
 #include "app/algorithm.h"
+#include "app/app_max30102.h"
 
-/**
- * 将数据读取与计算逻辑分离,将计算放到独立线程中。
- * 去除过多的全局变量,使用一个上下文结构体统一管理状态。
- * 
- * 改动点：
- * 1. 增加 struct max30102_task 结构体,用于存放所有原先的全局状态数据。
- * 2. 在初始化函数中创建线程,用于持续从设备读取数据,并定期调用算法计算心率和血氧。
- * 3. 原先在 init 和 task 函数中的计算移到线程中进行。
- * 4. app_max30102_task 中不再重复从设备读取数据,只需要从共享数据中获取当前结果或执行展示逻辑。
- * 5. 去初始化时停止线程,确保安全退出。
- */
+// MAX30102 设备节点路径
+#define MAX30102_FILE_PATH "/dev/iio:device2"
 
-#define MAX30102_FILE_PATH "/dev/iio:device2" // 用于数据读取的设备节点
+// sysfs 中的设备基路径
 #define SYSFS_DEVICE_BASE_PATH "/sys/bus/iio/devices/iio:device2"
+
+// 红光传感器路径
 #define RED_ENABLE_PATH SYSFS_DEVICE_BASE_PATH "/scan_elements/in_intensity_red_en"
+
+// 红外传感器启用路径
 #define IR_ENABLE_PATH SYSFS_DEVICE_BASE_PATH "/scan_elements/in_intensity_ir_en"
+
+// 缓冲区使能路径
 #define BUFFER_ENABLE_PATH SYSFS_DEVICE_BASE_PATH "/buffer/enable"
+
+// 缓冲区长度设置路径
 #define BUFFER_LENGTH_PATH SYSFS_DEVICE_BASE_PATH "/buffer/length"
 
 #define DATA_MASK ((1 << 18) - 1)
@@ -39,21 +70,32 @@
 #define DATA_BUF_SIZE 400
 #define SAMPLES_PER_CYCLE 100
 
+// MAX30102 任务结构体
 struct max30102_task {
-	int fd;
-	int spo2_valid;
-	int SpO2;
-	int hr_valid;
-	int heart_rate;
-
-	unsigned int aun_red_buf[DATA_BUF_SIZE];
-	unsigned int aun_ir_buf[DATA_BUF_SIZE];
-
-	pthread_t calc_thread;
-	pthread_mutex_t data_lock;
-	bool thread_running;
+	int fd;			// 设备文件描述符
+	int spo2_valid; // SpO2 数据有效性标志 1 有效，0 无效
+	int SpO2;		// SpO2 数据值，血氧饱和度百分比，范围通常是 0 到 100
+	int hr_valid;	// 心率数据有效性标志，1 有效，0 无效
+	int heart_rate; // 心率数据值，单位 BPM（每分钟心跳次数）
+	unsigned int aun_red_buf[DATA_BUF_SIZE]; // 红光传感器的数据缓冲区
+	unsigned int aun_ir_buf[DATA_BUF_SIZE];	 // 红外传感器的数据缓冲区
+	pthread_t calc_thread;					 //计算线程
+	pthread_mutex_t data_lock;				 // 互斥锁
+	bool thread_running;					 // 线程运行标志
 };
 
+/**
+ * @brief 向指定的文件写入整数数据
+ * 
+ * 该函数将整数数据写入指定的文件，通常用于向设备节点或系统文件中写入配置或控制命令。
+ * 例如，写入传感器的启用状态、配置值或其他整数参数。
+ * 
+ * @param filename 文件路径，指定目标文件的位置
+ * @param data 要写入的数据，通常是一个整数
+ * @return int 返回值：
+ *         - 如果成功写入数据，返回 0。
+ *         - 如果发生错误，返回负值，并设置 errno 以指示具体错误。
+ */
 static int write_sys_int(const char *filename, int data)
 {
 	int ret = 0;
@@ -93,6 +135,17 @@ static int write_sys_int(const char *filename, int data)
 	return 0;
 }
 
+/**
+ * @brief 启用或禁用所有传感器通道
+ * 
+ * 该函数用于启用或禁用 MAX30102 传感器的红光和红外光传感器通道。
+ * 通常用于在开始采集数据之前启用传感器，或者在结束采集时禁用传感器。
+ * 
+ * @param enable 如果为 1，则启用通道；如果为 0，则禁用通道
+ * @return int 返回值：
+ *         - 0 表示操作成功。
+ *         - 负值表示操作失败。
+ */
 static int enable_disable_all_channels(int enable)
 {
 	int ret = 0;
@@ -107,16 +160,45 @@ static int enable_disable_all_channels(int enable)
 	return 0;
 }
 
+/**
+ * @brief 启用或禁用缓冲区
+ * 
+ * 该函数用于启用或禁用 MAX30102 设备的缓冲区。启用缓冲区是采集数据时的前提。
+ * 
+ * @param enable 如果为 1，则启用缓冲区；如果为 0，则禁用缓冲区
+ * @return int 返回值：
+ *         - 0 表示操作成功。
+ *         - 负值表示操作失败。
+ */
 static int enable_disable_buffer(int enable)
 {
 	return write_sys_int(BUFFER_ENABLE_PATH, enable);
 }
 
+/**
+ * @brief 设置缓冲区长度
+ * 
+ * 该函数用于设置 MAX30102 设备的缓冲区长度。缓冲区用于存储采集到的数据， 
+ * 在数据采集过程中，根据需要动态调整缓冲区的大小。
+ * 
+ * @param len 缓冲区的长度，单位是样本数量
+ * @return int 返回值：
+ *         - 0 表示操作成功。
+ *         - 负值表示操作失败。
+ */
 static int set_buffer_len(int len)
 {
 	return write_sys_int(BUFFER_LENGTH_PATH, len);
 }
 
+/**
+ * @brief 清理和关闭 MAX30102 相关资源
+ * 
+ * 该函数用于关闭设备文件、禁用缓冲区和所有传感器通道，并释放相关资源。
+ * 通常在任务结束或出现错误时调用。
+ * 
+ * @param max30102 指向 MAX30102 任务结构体的指针
+ */
 static void cleanup(struct max30102_task *max30102)
 {
 	if (max30102->fd >= 0) {
@@ -127,6 +209,17 @@ static void cleanup(struct max30102_task *max30102)
 	enable_disable_all_channels(0);
 }
 
+/**
+ * @brief 读取一个数据样本
+ * 
+ * 该函数用于从 MAX30102 设备中读取一个数据样本（包含红光和红外光的原始数据）。
+ * 读取的结果会通过参数传出。
+ * 
+ * @param fd 设备文件描述符
+ * @param red_val 读取到的红光数据值
+ * @param ir_val 读取到的红外光数据值
+ * @return true 表示读取成功，false 表示读取失败
+ */
 static bool read_one_sample(int fd, unsigned int *red_val, unsigned int *ir_val)
 {
 	struct pollfd pfd = {
@@ -163,6 +256,17 @@ static bool read_one_sample(int fd, unsigned int *red_val, unsigned int *ir_val)
 	return true;
 }
 
+/**
+ * @brief 移动数据缓冲区
+ * 
+ * 该函数用于将已有的数据缓冲区向前移动指定的长度，并为新的数据腾出空间。
+ * 通常用于滑动窗口技术中，以便不断更新数据缓冲区。
+ * 
+ * @param red_buf 红光数据缓冲区
+ * @param ir_buf 红外光数据缓冲区
+ * @param total_len 缓冲区的总长度
+ * @param shift_len 移动的长度
+ */
 static void shift_data_buffer(
 	unsigned int *red_buf, unsigned int *ir_buf, int total_len, int shift_len)
 {
@@ -172,6 +276,15 @@ static void shift_data_buffer(
 	}
 }
 
+/**
+ * @brief 计算线程函数
+ * 
+ * 该函数在独立的线程中执行，定期读取样本数据并进行心率与血氧饱和度的计算。
+ * 每读取一定数量的新数据后，会调用算法函数重新计算心率和血氧。
+ * 
+ * @param arg 传入的参数，通常是 MAX30102 任务结构体的指针
+ * @return NULL
+ */
 static void *calc_thread_func(void *arg)
 {
 	struct max30102_task *max30102 = arg;

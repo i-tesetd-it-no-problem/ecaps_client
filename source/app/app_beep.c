@@ -27,14 +27,14 @@
  * 
  */
 
-#include "app/app_beep.h"
-#include "app/app_pwm.h"
-
-#include "utils/logger.h"
-
 #include <stdlib.h>
 #include <stdbool.h>
 #include <pthread.h>
+
+#include "utils/logger.h"
+
+#include "app/app_pwm.h"
+#include "app/app_beep.h"
 
 #define PWM_CHIP (0U)	 // PWM 号
 #define PWM_CHANNEL (0U) // PWM 通道 1

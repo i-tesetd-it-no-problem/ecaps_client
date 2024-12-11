@@ -1,3 +1,32 @@
+/**
+ * @file app_rs485.c
+ * @author wenshuyu (wsy2161826815@163.com)
+ * @brief RS485串口任务
+ * @version 1.0
+ * @date 2024-12-11
+ * 
+ * @copyright Copyright (c) 2024
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ * 
+ */
+
 #include <pthread.h>
 #include <sched.h>
 #include <stdio.h>
@@ -28,34 +57,37 @@
 uint8_t rx_buf[BUF_LEN];
 
 struct rs485_dev {
-	int fd;					  // 串口文件描述符
-	int epoll_fd;			  // epoll监听fd
-	int stop_fd;			  // 接收关闭信号
-	struct queue_info rx_q;	  // 接收队列
-	pthread_t thread;		  // 接收线程
-	pthread_rwlock_t rw_lock; // 读写锁
-	bool running;			  // 运行标志
+	int fd;						 // 串口文件描述符
+	int epoll_fd;				 // epoll监听fd
+	int stop_fd;				 // 接收关闭信号
+	struct queue_info rx_q;		 // 接收队列
+	pthread_t thread;			 // 接收线程
+	pthread_rwlock_t rw_lock;	 // 读写锁
+	bool running;				 // 运行标志
+	struct termios original_tio; // 原始termios设置
 };
 
-struct rs485_dev *g_485 = NULL;
+static struct rs485_dev *g_485 = NULL;
 
 /**
  * @brief 初始化串口
  * 
- * @param fd 文件描述符
+ * @param dev_rs485 rs485设备结构体指针
  * @return bool 
  */
-bool serial_init(int fd)
+static bool serial_init(struct rs485_dev *dev_rs485)
 {
 	struct termios options;
 
-	// 获取当前串口配置
-	if (tcgetattr(fd, &options) != 0) {
+	// 获取当前串口配置并保存
+	if (tcgetattr(dev_rs485->fd, &dev_rs485->original_tio) != 0) {
 		LOG_E("tcgetattr failed: %s", strerror(errno));
 		return false;
 	}
 
 	// 设置串口基本配置
+	options = dev_rs485->original_tio;
+
 	options.c_cflag |= (CLOCAL | CREAD); // 启用串口接收和本地模式
 	options.c_cflag &= ~CSIZE;			 // 清除数据位设置
 	options.c_cflag &= ~CRTSCTS;		 // 禁用硬件流控制
@@ -72,7 +104,7 @@ bool serial_init(int fd)
 	}
 
 	// 应用设置
-	if (tcsetattr(fd, TCSANOW, &options) != 0) {
+	if (tcsetattr(dev_rs485->fd, TCSANOW, &options) != 0) {
 		LOG_E("tcsetattr failed: %s", strerror(errno));
 		return false;
 	}
@@ -80,8 +112,42 @@ bool serial_init(int fd)
 	return true;
 }
 
-// 不断读取的线程
-void *read_thread(void *arg)
+/**
+ * @brief 关闭串口并清理串口配置
+ * 
+ * @param dev_rs485 rs485设备结构体指针
+ */
+static void serial_deinit(struct rs485_dev *dev_rs485)
+{
+	if (dev_rs485->fd < 0)
+		return;
+
+	// 确保所有数据已传输
+	if (tcdrain(dev_rs485->fd) != 0) {
+		LOG_E("tcdrain failed: %s", strerror(errno));
+	}
+
+	// 清空输入和输出缓冲区
+	if (tcflush(dev_rs485->fd, TCIOFLUSH) != 0) {
+		LOG_E("tcflush failed: %s", strerror(errno));
+	}
+
+	// 恢复原始termios设置
+	if (tcsetattr(dev_rs485->fd, TCSANOW, &dev_rs485->original_tio) != 0) {
+		LOG_E("tcsetattr restore failed: %s", strerror(errno));
+	}
+
+	// 关闭串口
+	close(dev_rs485->fd);
+}
+
+/**
+ * @brief 接收数据线程
+ * 
+ * @param arg 
+ * @return void* 
+ */
+static void *read_thread(void *arg)
 {
 	struct rs485_dev *app_485 = arg;
 
@@ -144,6 +210,9 @@ bool app_rs485_init(void **p_priv)
 		return false;
 	}
 	app_485->running = true;
+	app_485->fd = -1;
+	app_485->epoll_fd = -1;
+	app_485->stop_fd = -1;
 
 	int res = pthread_rwlock_init(&app_485->rw_lock, NULL);
 	if (res != 0) {
@@ -152,14 +221,14 @@ bool app_rs485_init(void **p_priv)
 	}
 
 	// 打开串口
-	app_485->fd = open(DEVICE_PATH, O_RDWR);
+	app_485->fd = open(DEVICE_PATH, O_RDWR | O_NOCTTY | O_NONBLOCK);
 	if (app_485->fd < 0) {
-		LOG_E("Open device:%s failed\n", DEVICE_PATH);
+		LOG_E("Open device:%s failed: %s", DEVICE_PATH, strerror(errno));
 		goto err_free_rwlock;
 	}
 
 	// 配置串口
-	ret = serial_init(app_485->fd);
+	ret = serial_init(app_485);
 	if (!ret)
 		goto err_close_fd;
 
@@ -225,7 +294,7 @@ err_close_epoll:
 	close(app_485->epoll_fd);
 
 err_close_fd:
-	close(app_485->fd);
+	serial_deinit(app_485);
 
 err_free_rwlock:
 	pthread_rwlock_destroy(&app_485->rw_lock);
@@ -262,33 +331,9 @@ void app_rs485_deinit(void *priv)
 	queue_destroy(&app_485->rx_q);
 	close(app_485->stop_fd);
 	close(app_485->epoll_fd);
-	close(app_485->fd);
+	serial_deinit(app_485);
 	pthread_rwlock_destroy(&app_485->rw_lock);
 	free(app_485);
-}
-
-/**
- * @brief rs485任务处理
- * 
- * @param priv 私有数据指针
- */
-void app_rs485_task(void *priv)
-{
-	if (!priv)
-		return;
-
-	struct rs485_dev *app_485 = priv;
-
-#define TEMP_READ_SIZE (256U)
-	uint8_t read_buf[TEMP_READ_SIZE] = { 0 };
-
-	size_t ret = queue_get(&app_485->rx_q, read_buf, TEMP_READ_SIZE);
-	if (ret <= 0)
-		return;
-
-	for (size_t i = 0; i < ret; i++)
-		printf("0x%02x ", read_buf[i]);
-	printf("\n");
 }
 
 /**
@@ -307,4 +352,56 @@ void app_rs485_write(uint8_t *buf, size_t len)
 		LOG_E("Write failed: %s", strerror(errno));
 
 	pthread_rwlock_unlock(&g_485->rw_lock);
+}
+
+/**
+ * @brief 测试收发是否正常
+ * 
+ */
+static void app_rs485_test(void)
+{
+	// 1s发一次
+	static size_t counter = 0;
+	counter += APP_RS485_TASK_PERIOD;
+	if (counter < 1000)
+		return;
+
+	counter = 0;
+	uint8_t test_data[] = {
+		0x06,
+		0x03,
+		0xE1,
+		0xC8,
+		0x00,
+		0x1E,
+		0x73,
+		0xB7,
+	};
+	app_rs485_write(test_data, sizeof(test_data));
+}
+
+/**
+ * @brief rs485任务处理
+ * 
+ * @param priv 私有数据指针
+ */
+void app_rs485_task(void *priv)
+{
+	if (!priv)
+		return;
+
+	struct rs485_dev *app_485 = priv;
+
+	app_rs485_test();
+
+#define TEMP_READ_SIZE (256U)
+	uint8_t read_buf[TEMP_READ_SIZE] = { 0 };
+
+	size_t ret = queue_get(&app_485->rx_q, read_buf, TEMP_READ_SIZE);
+	if (ret <= 0)
+		return;
+
+	for (size_t i = 0; i < ret; i++)
+		printf("0x%02x ", read_buf[i]);
+	printf("\n");
 }

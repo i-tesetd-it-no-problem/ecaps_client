@@ -1,5 +1,31 @@
-#include "utils/epoll_timer.h"
-#include "utils/logger.h"
+/**
+ * @file epoll_timer.c
+ * @author wenshuyu (wsy2161826815@163.com)
+ * @brief 定时器任务事件驱动组件
+ * @version 1.0
+ * @date 2024-12-11
+ * 
+ * @copyright Copyright (c) 2024
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ * 
+ */
 
 #include <string.h>
 #include <sys/epoll.h>
@@ -13,25 +39,20 @@
 #include <fcntl.h>
 #include <sys/eventfd.h>
 
+#include "utils/epoll_timer.h"
+#include "utils/logger.h"
+
 // 最大事件数
 #ifndef MAX_EVENTS
 #define MAX_EVENTS 64
 #endif
 
-// 函数指针
-struct task_f {
-	timer_task_init f_init;		// 初始化函数
-	timer_task_entry f_entry;	// 任务处理函数
-	timer_task_deinit f_deinit; // 去初始化函数
-};
-
 // 任务实例
 struct timer_task {
-	struct task_f *task_f; // 函数指针
-	size_t period_ms;	   // 任务周期
-	int timer_fd;		   // 定时器描述符
+	const struct epoll_timer_task *ept_task_f; // 函数指针
+	int timer_fd;							   // 定时器描述符
+	void *priv;								   // 私有数据
 
-	void *priv; // 私有数据
 	struct timer_task *prev;
 	struct timer_task *next;
 };
@@ -138,11 +159,11 @@ void epoll_timer_destroy(et_handle handle)
 	while (task) {
 		struct timer_task *next_task = task->next;
 
-		if (task->task_f) {
-			if (task->task_f->f_deinit)
-				task->task_f->f_deinit(task->priv);
-
-			free(task->task_f);
+		if (task->ept_task_f) {
+			if (task->ept_task_f->f_deinit) {
+				task->ept_task_f->f_deinit(task->priv);
+				LOG_I("%s has stopped", task->ept_task_f->task_name);
+			}
 		}
 
 		if (task->timer_fd >= 0)
@@ -188,14 +209,15 @@ bool epoll_timer_add_task(et_handle handle, const struct epoll_timer_task *task_
 	// 任务初始化
 	if (task_info->f_init) {
 		if (!task_info->f_init(&new_task->priv)) {
-			LOG_E("Task initialization failed.");
+			LOG_E("%s init failed", task_info->task_name);
 			goto err_free_new_task;
-		}
+		} else
+			LOG_I("%s init successful", task_info->task_name);
 	}
 
 	// 如果周期为0或没有任务处理函数，只进行初始化
 	if (task_info->period_ms == 0 || task_info->f_entry == NULL) {
-		LOG_I("Task has no entry function or zero period, only ran initialization.");
+		LOG_W("Task has no entry function or zero period, only ran init.");
 
 		// 添加到任务链表
 		pthread_mutex_lock(&handle->lock);
@@ -208,24 +230,13 @@ bool epoll_timer_add_task(et_handle handle, const struct epoll_timer_task *task_
 		return true; // 返回成功
 	}
 
-	// 分配任务函数结构
-	new_task->task_f = malloc(sizeof(struct task_f));
-	if (!new_task->task_f) {
-		LOG_E("Failed to allocate memory for task functions.");
-		goto err_free_new_task;
-	}
-
-	// 设置任务的函数指针和周期
-	new_task->task_f->f_init = task_info->f_init;
-	new_task->task_f->f_entry = task_info->f_entry;
-	new_task->task_f->f_deinit = task_info->f_deinit;
-	new_task->period_ms = task_info->period_ms;
+	new_task->ept_task_f = task_info;
 
 	// 创建定时器文件描述符
 	new_task->timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC);
 	if (new_task->timer_fd < 0) {
 		LOG_E("Failed to create timerfd: %s", strerror(errno));
-		goto err_free_task_f;
+		goto err_free_new_task;
 	}
 
 	// 设置定时器的周期和初始时间
@@ -269,13 +280,11 @@ err_close_timer_fd:
 	if (new_task->timer_fd >= 0)
 		close(new_task->timer_fd);
 
-err_free_task_f:
-	if (new_task->task_f)
-		free(new_task->task_f);
-
 err_free_new_task:
-	if (task_info->f_deinit)
+	if (task_info->f_deinit) {
 		task_info->f_deinit(new_task->priv);
+		LOG_E("%s has deinited", task_info->task_name);
+	}
 
 	free(new_task);
 
@@ -306,7 +315,7 @@ bool epoll_timer_remove_task(et_handle handle, const struct epoll_timer_task *ta
 	pthread_mutex_lock(&handle->lock);
 	struct timer_task *task = handle->task_list;
 	while (task) {
-		if (task->task_f && task->task_f->f_entry == task_info->f_entry) {
+		if (task->ept_task_f && task->ept_task_f->f_entry == task_info->f_entry) {
 			// 移除
 			if (task->timer_fd >= 0) {
 				if (epoll_ctl(handle->epoll_fd, EPOLL_CTL_DEL, task->timer_fd, NULL) < 0) {
@@ -316,8 +325,8 @@ bool epoll_timer_remove_task(et_handle handle, const struct epoll_timer_task *ta
 			}
 
 			// 调用去初始化函数
-			if (task->task_f->f_deinit)
-				task->task_f->f_deinit(task->priv);
+			if (task->ept_task_f->f_deinit)
+				task->ept_task_f->f_deinit(task->priv);
 
 			// 移除任务链表
 			if (task->prev)
@@ -329,10 +338,11 @@ bool epoll_timer_remove_task(et_handle handle, const struct epoll_timer_task *ta
 				task->next->prev = task->prev;
 
 			// 释放资源
-			free(task->task_f);
 			free(task);
 
 			pthread_mutex_unlock(&handle->lock);
+
+			LOG_I("%s has stoped and removed", task_info->task_name);
 			return true;
 		}
 		task = task->next;
@@ -417,7 +427,7 @@ int epoll_timer_run(et_handle handle)
 				if (s < 0 && errno != EAGAIN)
 					LOG_E("Failed to read stop eventfd: %s", strerror(errno));
 
-				LOG_I("Received stop signal. Exiting run loop.");
+				LOG_W("Received stop signal. Exiting run loop.");
 				pthread_mutex_lock(&handle->lock);
 				handle->running = false;
 				pthread_mutex_unlock(&handle->lock);
@@ -439,8 +449,8 @@ int epoll_timer_run(et_handle handle)
 					continue;
 				}
 
-				if (task->task_f && task->task_f->f_entry)
-					task->task_f->f_entry(task->priv); // 执行任务
+				if (task->ept_task_f && task->ept_task_f->f_entry)
+					task->ept_task_f->f_entry(task->priv); // 执行任务
 			}
 		}
 	}

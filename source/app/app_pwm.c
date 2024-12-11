@@ -47,7 +47,7 @@
  * @param value 写入的值
  * @return bool 
  */
-bool write_to_file(const char *path, const char *value)
+static bool write_to_file(const char *path, const char *value)
 {
 	int fd = open(path, O_WRONLY);
 	if (fd < 0) {
@@ -79,7 +79,7 @@ bool export_pwm(uint8_t pwm_chip, uint8_t pwm_num)
 	snprintf(path, sizeof(path), PWM_PATH_FORMAT, pwm_chip, pwm_num);
 	struct stat st;
 	if (stat(path, &st) == 0) {
-		LOG_I("PWM %d already exported", pwm_num);
+		LOG_W("PWM %d already exported", pwm_num);
 		return true;
 	}
 
