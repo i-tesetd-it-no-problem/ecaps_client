@@ -69,7 +69,7 @@ struct epoll_timer {
 /**
  * @brief 创建epoll监听句柄
  * 
- * @return et_handle 失败返回NULL，成功返回句柄
+ * @return et_handle 失败返回NULL,成功返回句柄
  */
 et_handle epoll_timer_create(void)
 {
@@ -87,7 +87,7 @@ et_handle epoll_timer_create(void)
 		goto err_free_handle;
 	}
 
-	// 创建epoll实例，使用EPOLL_CLOEXEC
+	// 创建epoll实例,使用EPOLL_CLOEXEC
 	handle->epoll_fd = epoll_create1(EPOLL_CLOEXEC);
 	if (handle->epoll_fd < 0) {
 		LOG_E("Failed to create epoll instance: %s", strerror(errno));
@@ -215,7 +215,7 @@ bool epoll_timer_add_task(et_handle handle, const struct epoll_timer_task *task_
 			LOG_I("%s init successful", task_info->task_name);
 	}
 
-	// 如果周期为0或没有任务处理函数，只进行初始化
+	// 如果周期为0或没有任务处理函数,只进行初始化
 	if (task_info->period_ms == 0 || task_info->f_entry == NULL) {
 		LOG_W("Task has no entry function or zero period, only ran init.");
 
@@ -295,7 +295,7 @@ err_free_new_task:
  * @brief 从监听事件中移除定时器任务
  * 
  * @param handle epoll句柄
- * @param task_info 任务指针（需要匹配 f_entry）
+ * @param task_info 任务指针(需要匹配 f_entry)
  * @return true 成功
  * @return false 失败
  */
@@ -414,7 +414,7 @@ int epoll_timer_run(et_handle handle)
 		}
 
 		if (nfds == 0) {
-			// 理论上不会发生，因为超时为-1
+			// 理论上不会发生,因为超时为-1
 			LOG_W("epoll_wait returned 0, unexpected with infinite timeout.");
 			continue;
 		}

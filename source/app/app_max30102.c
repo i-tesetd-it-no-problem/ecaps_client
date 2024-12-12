@@ -73,10 +73,10 @@
 // MAX30102 任务结构体
 struct max30102_task {
 	int fd;			// 设备文件描述符
-	int spo2_valid; // SpO2 数据有效性标志 1 有效，0 无效
-	int SpO2;		// SpO2 数据值，血氧饱和度百分比，范围通常是 0 到 100
-	int hr_valid;	// 心率数据有效性标志，1 有效，0 无效
-	int heart_rate; // 心率数据值，单位 BPM（每分钟心跳次数）
+	int spo2_valid; // SpO2 数据有效性标志 1 有效,0 无效
+	int SpO2;		// SpO2 数据值,血氧饱和度百分比,范围通常是 0 到 100
+	int hr_valid;	// 心率数据有效性标志,1 有效,0 无效
+	int heart_rate; // 心率数据值,单位 BPM(每分钟心跳次数)
 	unsigned int aun_red_buf[DATA_BUF_SIZE]; // 红光传感器的数据缓冲区
 	unsigned int aun_ir_buf[DATA_BUF_SIZE];	 // 红外传感器的数据缓冲区
 	pthread_t calc_thread;					 //计算线程
@@ -87,14 +87,14 @@ struct max30102_task {
 /**
  * @brief 向指定的文件写入整数数据
  * 
- * 该函数将整数数据写入指定的文件，通常用于向设备节点或系统文件中写入配置或控制命令。
- * 例如，写入传感器的启用状态、配置值或其他整数参数。
+ * 该函数将整数数据写入指定的文件,通常用于向设备节点或系统文件中写入配置或控制命令.
+ * 例如,写入传感器的启用状态、配置值或其他整数参数.
  * 
- * @param filename 文件路径，指定目标文件的位置
- * @param data 要写入的数据，通常是一个整数
+ * @param filename 文件路径,指定目标文件的位置
+ * @param data 要写入的数据,通常是一个整数
  * @return int 返回值：
- *         - 如果成功写入数据，返回 0。
- *         - 如果发生错误，返回负值，并设置 errno 以指示具体错误。
+ *         - 如果成功写入数据,返回 0.
+ *         - 如果发生错误,返回负值,并设置 errno 以指示具体错误.
  */
 static int write_sys_int(const char *filename, int data)
 {
@@ -138,13 +138,13 @@ static int write_sys_int(const char *filename, int data)
 /**
  * @brief 启用或禁用所有传感器通道
  * 
- * 该函数用于启用或禁用 MAX30102 传感器的红光和红外光传感器通道。
- * 通常用于在开始采集数据之前启用传感器，或者在结束采集时禁用传感器。
+ * 该函数用于启用或禁用 MAX30102 传感器的红光和红外光传感器通道.
+ * 通常用于在开始采集数据之前启用传感器,或者在结束采集时禁用传感器.
  * 
- * @param enable 如果为 1，则启用通道；如果为 0，则禁用通道
+ * @param enable 如果为 1,则启用通道；如果为 0,则禁用通道
  * @return int 返回值：
- *         - 0 表示操作成功。
- *         - 负值表示操作失败。
+ *         - 0 表示操作成功.
+ *         - 负值表示操作失败.
  */
 static int enable_disable_all_channels(int enable)
 {
@@ -163,12 +163,12 @@ static int enable_disable_all_channels(int enable)
 /**
  * @brief 启用或禁用缓冲区
  * 
- * 该函数用于启用或禁用 MAX30102 设备的缓冲区。启用缓冲区是采集数据时的前提。
+ * 该函数用于启用或禁用 MAX30102 设备的缓冲区.启用缓冲区是采集数据时的前提.
  * 
- * @param enable 如果为 1，则启用缓冲区；如果为 0，则禁用缓冲区
+ * @param enable 如果为 1,则启用缓冲区；如果为 0,则禁用缓冲区
  * @return int 返回值：
- *         - 0 表示操作成功。
- *         - 负值表示操作失败。
+ *         - 0 表示操作成功.
+ *         - 负值表示操作失败.
  */
 static int enable_disable_buffer(int enable)
 {
@@ -178,13 +178,13 @@ static int enable_disable_buffer(int enable)
 /**
  * @brief 设置缓冲区长度
  * 
- * 该函数用于设置 MAX30102 设备的缓冲区长度。缓冲区用于存储采集到的数据， 
- * 在数据采集过程中，根据需要动态调整缓冲区的大小。
+ * 该函数用于设置 MAX30102 设备的缓冲区长度.缓冲区用于存储采集到的数据, 
+ * 在数据采集过程中,根据需要动态调整缓冲区的大小.
  * 
- * @param len 缓冲区的长度，单位是样本数量
+ * @param len 缓冲区的长度,单位是样本数量
  * @return int 返回值：
- *         - 0 表示操作成功。
- *         - 负值表示操作失败。
+ *         - 0 表示操作成功.
+ *         - 负值表示操作失败.
  */
 static int set_buffer_len(int len)
 {
@@ -194,8 +194,8 @@ static int set_buffer_len(int len)
 /**
  * @brief 清理和关闭 MAX30102 相关资源
  * 
- * 该函数用于关闭设备文件、禁用缓冲区和所有传感器通道，并释放相关资源。
- * 通常在任务结束或出现错误时调用。
+ * 该函数用于关闭设备文件、禁用缓冲区和所有传感器通道,并释放相关资源.
+ * 通常在任务结束或出现错误时调用.
  * 
  * @param max30102 指向 MAX30102 任务结构体的指针
  */
@@ -212,13 +212,13 @@ static void cleanup(struct max30102_task *max30102)
 /**
  * @brief 读取一个数据样本
  * 
- * 该函数用于从 MAX30102 设备中读取一个数据样本（包含红光和红外光的原始数据）。
- * 读取的结果会通过参数传出。
+ * 该函数用于从 MAX30102 设备中读取一个数据样本(包含红光和红外光的原始数据).
+ * 读取的结果会通过参数传出.
  * 
  * @param fd 设备文件描述符
  * @param red_val 读取到的红光数据值
  * @param ir_val 读取到的红外光数据值
- * @return true 表示读取成功，false 表示读取失败
+ * @return true 表示读取成功,false 表示读取失败
  */
 static bool read_one_sample(int fd, unsigned int *red_val, unsigned int *ir_val)
 {
@@ -259,8 +259,8 @@ static bool read_one_sample(int fd, unsigned int *red_val, unsigned int *ir_val)
 /**
  * @brief 移动数据缓冲区
  * 
- * 该函数用于将已有的数据缓冲区向前移动指定的长度，并为新的数据腾出空间。
- * 通常用于滑动窗口技术中，以便不断更新数据缓冲区。
+ * 该函数用于将已有的数据缓冲区向前移动指定的长度,并为新的数据腾出空间.
+ * 通常用于滑动窗口技术中,以便不断更新数据缓冲区.
  * 
  * @param red_buf 红光数据缓冲区
  * @param ir_buf 红外光数据缓冲区
@@ -279,10 +279,10 @@ static void shift_data_buffer(
 /**
  * @brief 计算线程函数
  * 
- * 该函数在独立的线程中执行，定期读取样本数据并进行心率与血氧饱和度的计算。
- * 每读取一定数量的新数据后，会调用算法函数重新计算心率和血氧。
+ * 该函数在独立的线程中执行,定期读取样本数据并进行心率与血氧饱和度的计算.
+ * 每读取一定数量的新数据后,会调用算法函数重新计算心率和血氧.
  * 
- * @param arg 传入的参数，通常是 MAX30102 任务结构体的指针
+ * @param arg 传入的参数,通常是 MAX30102 任务结构体的指针
  * @return NULL
  */
 static void *calc_thread_func(void *arg)

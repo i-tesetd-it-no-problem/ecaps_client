@@ -34,7 +34,7 @@
 #include "ssl/build_request.h"
 
 /**
- * @brief 构建HTTPS GET请求字符串。
+ * @brief 构建HTTPS GET请求字符串.
  * 
  * @param url 
  * @param buffer 
@@ -123,7 +123,7 @@ int build_get_request(const char *url, char *buffer, size_t buffer_size)
 }
 
 /**
- * 构建一个HTTP POST请求字符串。
+ * 构建一个HTTP POST请求字符串.
  */
 int build_post_request(
 	const char *url, const char *content_type, const char *body, char *buffer, size_t buffer_size)

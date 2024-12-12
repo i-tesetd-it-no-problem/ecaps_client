@@ -35,7 +35,7 @@
 #include <stdlib.h>
 
 /**
- * 构建一个HTTP GET请求字符串。
+ * 构建一个HTTP GET请求字符串.
  *
  * @param url 完整的URL(例如 "https://www.example.com/test")
  * @param buffer 用于存储请求的缓冲区
@@ -45,7 +45,7 @@
 int build_get_request(const char* url, char* buffer, size_t buffer_size);
 
 /**
- * 构建一个HTTP POST请求字符串。
+ * 构建一个HTTP POST请求字符串.
  *
  * @param url 完整的URL(例如 "https://www.example.com/submit_sensor_data")
  * @param content_type 内容类型(例如 "application/json")

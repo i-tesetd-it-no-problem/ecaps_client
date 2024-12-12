@@ -1,5 +1,5 @@
 # 证书配置
-注: 可直接跳到 [快速生成](#4-快速生成) 章节。
+注: 可直接跳到 [快速生成](#4-快速生成) 章节.
 
 ## 目录
 - [1. 创建CA及根证书](#1-创建ca及根证书)
@@ -30,13 +30,13 @@ openssl req -new -x509 -days 3650 -key ca.key -out ca.pem
 
 在执行 命令时,系统会提示您输入一些信息：
 
-- **Country Name (2 letter code) [XX]**: 输入国家代码,例如 CN 表示中国。
-- **State or Province Name (full name) []**: 输入省份名称,例如 ShangHai。
-- **Locality Name (eg, city) [Default City]**: 输入城市名称,例如 ShangHai。
-- **Organization Name (eg, company) [Default Company Ltd]**: 输入您的组织或公司名称,例如 My Company。
-- **Organizational Unit Name (eg, section) []**: 输入组织单位名称,例如 IT Department。
-- **Common Name (eg, your name or your server's hostname) []**: 输入 CA 的名称,例如 My Root CA。
-- **Email Address []**: 输入联系邮箱,或留空。
+- **Country Name (2 letter code) [XX]**: 输入国家代码,例如 CN 表示中国.
+- **State or Province Name (full name) []**: 输入省份名称,例如 ShangHai.
+- **Locality Name (eg, city) [Default City]**: 输入城市名称,例如 ShangHai.
+- **Organization Name (eg, company) [Default Company Ltd]**: 输入您的组织或公司名称,例如 My Company.
+- **Organizational Unit Name (eg, section) []**: 输入组织单位名称,例如 IT Department.
+- **Common Name (eg, your name or your server's hostname) []**: 输入 CA 的名称,例如 My Root CA.
+- **Email Address []**: 输入联系邮箱,或留空.
 
 ## 2. 使用 CA 签发服务器证书
 
