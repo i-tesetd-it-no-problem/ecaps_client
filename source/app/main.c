@@ -190,16 +190,16 @@ int main(int argc, const char *argv[])
 
 	// 添加所有周期任务待监听
 #ifdef BOARD_ENV
-	// epoll_timer_add_task(ept, &led_task);
-	// epoll_timer_add_task(ept, &si7006_task);
-	// epoll_timer_add_task(ept, &lmv358_task);
-	// epoll_timer_add_task(ept, &digital_task);
-	// epoll_timer_add_task(ept, &beep_task);
-	// epoll_timer_add_task(ept, &fan_task);
-	// epoll_timer_add_task(ept, &motor_task);
-	// epoll_timer_add_task(ept, &ap3216c_task);
-	// epoll_timer_add_task(ept, &max30102_task);
-	// epoll_timer_add_task(ept, &rs485_task);
+	epoll_timer_add_task(ept, &led_task);
+	epoll_timer_add_task(ept, &si7006_task);
+	epoll_timer_add_task(ept, &lmv358_task);
+	epoll_timer_add_task(ept, &digital_task);
+	epoll_timer_add_task(ept, &beep_task);
+	epoll_timer_add_task(ept, &fan_task);
+	epoll_timer_add_task(ept, &motor_task);
+	epoll_timer_add_task(ept, &ap3216c_task);
+	epoll_timer_add_task(ept, &max30102_task);
+	epoll_timer_add_task(ept, &rs485_task);
 	epoll_timer_add_task(ept, &can_task);
 
 #else
