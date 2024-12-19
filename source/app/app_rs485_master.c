@@ -47,9 +47,8 @@
 #include "protocol/modbus.h"
 #include "utils/logger.h"
 #include "utils/queue.h"
-#include "app/modbus_priv_reg.h"
-#include "protocol/modbus_slave.h"
-#include "app/app_rs485.h"
+#include "protocol/modbus_master.h"
+#include "app/app_rs485_master.h"
 
 #define DEVICE_PATH "/dev/ttySTM1" // 设备路径
 
@@ -349,40 +348,98 @@ static struct serial_opts s_485_opts = {
 	.f_check_send = slave_check_send,
 };
 
-//BMS设备明文参数
-static uint8_t _reg_1000_1199_rtu_slave_handle(
-	uint8_t func, uint16_t reg, uint16_t reg_num, uint16_t *p_in_out)
+static mb_mst_handle m_mb_mst_handle = NULL;
+
+/**************************读测试**************************/
+
+static void read_hanlde(uint8_t *data, size_t len, bool is_timeout)
 {
-	uint16_t *p;
-
-	LOG_I("func is 0x%02x, reg is 0x%04x, reg_num is 0x%04x", func, reg, reg_num);
-
-	if (func == MODBUS_FUN_RD_REG_MUL) {
-		LOG_I("Read multiple registers");
-	} else if (func == MODBUS_FUN_WR_REG_MUL) {
-		LOG_I("Write multiple registers");
-	} else {
-		LOG_I("Read/Write single register");
+	if (is_timeout) {
+		LOG_E("Timeout");
+		return;
 	}
 
-	return MODBUS_RESP_SUCCESS;
+	LOG_I("read successful");
 }
 
-static struct mb_slv_work resp_table[] = {
-	{
-		.start = REG_1000_1199_BAT_ID,
-		.end = REG_1000_1199_END,
-		.resp = _reg_1000_1199_rtu_slave_handle,
-	},
+static uint8_t test_cmd[2] = { 0 };
+static struct mb_mst_request read_post = {
+	.slave_addr = 0x06,
+	.func = MODBUS_FUN_RD_REG_MUL,
+	.reg_addr = 1069,
+	.reg_len = 1,
+	.resp = read_hanlde,
+	.timeout_ms = 100,
 };
 
-static mb_slv_handle m_mb_slv_handle = NULL;
-
-bool app_rs485_init(void **p_priv)
+static void app_read_test(void)
 {
-	m_mb_slv_handle =
-		mb_slv_init(&s_485_opts, 0x06, resp_table, sizeof(resp_table) / sizeof(resp_table[0]));
-	if (!m_mb_slv_handle) {
+	if (!m_mb_mst_handle)
+		return;
+
+	// 1s一次
+	static size_t counter = 0;
+	counter += APP_RS485_TASK_MASTER_PERIOD;
+	if (counter < 2000)
+		return;
+	counter = 0;
+
+	mb_mst_pdu_request(m_mb_mst_handle, &read_post);
+}
+
+/**************************写测试**************************/
+
+static void write_hanlde(uint8_t *data, size_t len, bool is_timeout)
+{
+	if (is_timeout) {
+		LOG_E("Timeout");
+		return;
+	}
+
+	LOG_I("Write successful");
+}
+
+static uint8_t temp_data[2] = { 0 };
+static struct mb_mst_request write_post = {
+	.slave_addr = 0x06,
+	.data = temp_data,
+	.func = MODBUS_FUN_WR_REG_MUL,
+	.reg_addr = 55000,
+	.reg_len = 1,
+	.resp = write_hanlde,
+	.timeout_ms = 100,
+	.data_len = 2,
+};
+
+static void app_write_test(void)
+{
+	if (!m_mb_mst_handle)
+		return;
+
+	// 1s一次
+	static size_t counter = 0;
+	counter += APP_RS485_TASK_MASTER_PERIOD;
+	if (counter < 1000)
+		return;
+	counter = 0;
+
+	mb_mst_pdu_request(m_mb_mst_handle, &write_post);
+}
+
+/*****************************所有请求任务*****************************/
+
+static void app_request_task(void)
+{
+	app_read_test();
+	// app_write_test();
+}
+
+/***************************API***************************/
+
+bool app_rs485_master_init(void **p_priv)
+{
+	m_mb_mst_handle = mb_mst_init(&s_485_opts, APP_RS485_TASK_MASTER_PERIOD);
+	if (!m_mb_mst_handle) {
 		LOG_E("Init modbus slave failed");
 		return false;
 	}
@@ -395,7 +452,7 @@ bool app_rs485_init(void **p_priv)
  * 
  * @param priv 私有数据指针
  */
-void app_rs485_deinit(void *priv)
+void app_rs485_master_deinit(void *priv)
 {
 	if (!priv)
 		return;
@@ -420,26 +477,8 @@ void app_rs485_deinit(void *priv)
 	pthread_rwlock_destroy(&app_485->rw_lock);
 	free(app_485);
 
-	mb_slv_destroy(m_mb_slv_handle);
-	m_mb_slv_handle = NULL;
-}
-
-/**
- * @brief 发送数据
- * 
- * @param buf 数据缓冲
- * @param len 数据长度
- */
-void app_rs485_write(uint8_t *buf, size_t len)
-{
-	if (!buf || !len || !g_485 || g_485->fd < 0)
-		return;
-
-	pthread_rwlock_wrlock(&g_485->rw_lock);
-	if (write(g_485->fd, buf, len) < 0)
-		LOG_E("Write failed: %s", strerror(errno));
-
-	pthread_rwlock_unlock(&g_485->rw_lock);
+	mb_mst_destroy(m_mb_mst_handle);
+	m_mb_mst_handle = NULL;
 }
 
 /**
@@ -447,10 +486,12 @@ void app_rs485_write(uint8_t *buf, size_t len)
  * 
  * @param priv 私有数据指针
  */
-void app_rs485_task(void *priv)
+void app_rs485_master_task(void *priv)
 {
 	if (!priv)
 		return;
 
-	mb_slv_poll(m_mb_slv_handle);
+	app_request_task();
+
+	mb_mst_poll(m_mb_mst_handle);
 }

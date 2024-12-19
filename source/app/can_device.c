@@ -27,6 +27,7 @@
  * 
  */
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -48,36 +49,18 @@
 #include "app/can_device.h"
 
 struct can_device {
-	const struct can_config *config;
-	int socket_fd;	  // CAN套接字文件描述符
-	int stop_fd;	  // 停止信号文件描述符
-	int epfd;		  // epoll文件描述符
-	pthread_t thread; // 读取线程
+	const struct can_config *config; // 用户配置
+	int socket_fd;					 // CAN套接字文件描述符
+	int stop_fd;					 // 停止信号文件描述符
+	int epfd;						 // epoll文件描述符
+	pthread_t thread;				 // 读取线程
 };
 
 /**
- * @brief 统一清理函数
- * 
- * @param dev CAN设备结构体指针
- * @param socket_fd CAN套接字文件描述符
- */
-static void cleanup(can_handle handle, int socket_fd)
-{
-	if (handle) {
-		if (handle->epfd > 0)
-			close(handle->epfd);
-		if (handle->stop_fd > 0)
-			close(handle->stop_fd);
-		free(handle);
-	}
-	if (socket_fd > 0)
-		close(socket_fd);
-}
-
-/**
- * @brief 构造 CAN 帧
+ * @brief 构造一帧CAN帧
  *
- * @param frame 指向待填充的 `struct can_frame` 结构体的指针
+ * @param CAN 句柄
+ * @param frame 待填充的CAN帧
  * @param data 有效载荷数据
  * @param len 有效载荷长度 范围 0 到 CAN_MAX_DLEN (8)
  * @return true 构造成功
@@ -102,16 +85,15 @@ static bool make_one_can_frame(
 	}
 
 	frame->can_id = handle->config->can_id;
-	frame->can_dlc = len;
+	frame->len = len;
 
 	// 填充有效载荷数据
 	if (len > 0 && data != NULL) {
 		memcpy(frame->data, data, len);
 		if (len < CAN_MAX_DLEN)
-			memset(frame->data + len, 0, CAN_MAX_DLEN - len); // 补零
-	} else {
+			memset(frame->data + len, 0, CAN_MAX_DLEN - len); // 不足8个补零
+	} else
 		memset(frame->data, 0, CAN_MAX_DLEN);
-	}
 
 	return true;
 }
@@ -120,17 +102,20 @@ static bool make_one_can_frame(
  * @brief 配置CAN过滤器
  *
  * @param socket_fd CAN套接字
- * @param filters 过滤器数组,包含多个CAN ID和掩码
- * @param filter_count 过滤器的数量
- * @return true 成功配置过滤器
- * @return false 配置过滤器失败
+ * @param filters 过滤器数组,包含多组CAN ID和掩码
+ * @param filter_count 过滤器数量
+ * @return true 成功
+ * @return false 失败
  */
 static bool configure_can_filters(int socket_fd, struct can_filter *filters, size_t filter_count)
 {
-	if (!filters || filter_count == 0) {
-		LOG_E("Invalid filters or filter count");
+	if (socket_fd < 0) {
+		LOG_E("Invalid socket_fd");
 		return false;
 	}
+
+	if (!filters || filter_count == 0)
+		return true; // 没有过滤器,直接返回
 
 	if (setsockopt(socket_fd, SOL_CAN_RAW, CAN_RAW_FILTER, filters,
 			filter_count * sizeof(struct can_filter)) < 0) {
@@ -142,9 +127,48 @@ static bool configure_can_filters(int socket_fd, struct can_filter *filters, siz
 }
 
 /**
- * @brief 读取线程函数,监听CAN套接字和停止通知
+ * @brief 处理监听的fd事件
+ * 
+ * @param handle CAN句柄
+ * @param trigger_fd 触发的fd
+ * @return true 处理完成继续等待
+ * @return false 退出监听
+ */
+static bool can_epoll_fd_handle(can_handle handle, int trigger_fd)
+{
+	if (!handle || trigger_fd < 0)
+		return false;
+
+	struct can_frame frame;
+
+	// 停止事件
+	if (handle->stop_fd == trigger_fd) {
+		uint64_t u;
+		if (read(handle->stop_fd, &u, sizeof(uint64_t)) < 0)
+			LOG_E("Failed to read from stop_fd: %s", strerror(errno));
+		return false; // 退出线程
+	} else if (handle->socket_fd == trigger_fd) {
+		// 接收事件
+
+		int nbytes = read(handle->socket_fd, &frame, sizeof(struct can_frame));
+
+		if (nbytes < 0)
+			handle->config->cb(NULL);
+		else if (nbytes == sizeof(struct can_frame) && handle->config && handle->config->cb)
+			handle->config->cb(&frame); // 接收到正常数据
+		else
+			handle->config->cb(NULL);
+
+		return true; // 继续等待
+	}
+
+	return false; // 未知fd, 继续等待
+}
+
+/**
+ * @brief 读取线程,监听CAN接收事件和停止通知
  *
- * @param arg 指向can_device结构体的指针
+ * @param arg 指向CAN句柄
  * @return void* 返回NULL
  */
 static void *can_read_thread_func(void *arg)
@@ -152,8 +176,8 @@ static void *can_read_thread_func(void *arg)
 	if (!arg)
 		return NULL;
 
-	can_handle handle = arg;	  // can句柄
-	struct epoll_event events[2]; // epoll事件数组
+	can_handle handle = arg;	  // CAN句柄
+	struct epoll_event events[2]; // epoll事件数组 (CAN接收事件和停止通知)
 	struct can_frame frame;		  // 读取的CAN帧
 
 	while (1) {
@@ -165,24 +189,15 @@ static void *can_read_thread_func(void *arg)
 			break;
 		}
 
+		// 处理监听事件
 		for (int i = 0; i < n; i++) {
-			if (events[i].data.fd == handle->stop_fd) {
-				uint64_t u;
-				if (read(handle->stop_fd, &u, sizeof(uint64_t)) < 0)
-					LOG_E("Failed to read from stop_fd: %s", strerror(errno));
-				return NULL; // 退出线程
-			} else if (events[i].data.fd == handle->socket_fd) {
-				int nbytes = read(handle->socket_fd, &frame, sizeof(struct can_frame));
-				if (nbytes < 0)
-					handle->config->handle(NULL);
-				else if (nbytes == sizeof(struct can_frame) && handle->config &&
-					handle->config->handle)
-					handle->config->handle(&frame); // 接收到正常数据
-				else
-					handle->config->handle(NULL);
-			}
+			int trigger_fd = events[i].data.fd;
+			if (!can_epoll_fd_handle(handle, trigger_fd))
+				goto exit;
 		}
 	}
+
+exit:
 	return NULL;
 }
 
@@ -256,10 +271,26 @@ static void shutdown_can_interface(const struct can_config *config)
 }
 
 /**
+ * @brief 初始化的辅助清理函数
+ * 
+ * @param dev CAN句柄
+ * @param socket_fd CAN套接字文件描述符
+ */
+static void cleanup(can_handle handle, int socket_fd)
+{
+	if (handle) {
+		if (handle->epfd > 0)
+			close(handle->epfd);
+		if (handle->stop_fd > 0)
+			close(handle->stop_fd);
+		free(handle);
+	}
+	if (socket_fd > 0)
+		close(socket_fd);
+}
+
+/**
  * @brief CAN设备初始化
- *
- * 初始化CAN套接字,设置接口,绑定套接字到CAN设备,创建epoll实例,
- * 添加CAN套接字和eventfd到epoll,并启动读取线程.
  *
  * @param config 用户配置信息
  * @return true 初始化成功
@@ -293,7 +324,7 @@ can_handle can_device_init(const struct can_config *config)
 	}
 
 	// 设置CAN设备名
-	memset(&ifr, 0, sizeof(ifr));
+	memset(&ifr, 0, sizeof(struct ifreq));
 	strncpy(ifr.ifr_name, config->can_dev_name, IFNAMSIZ - 1);
 
 	// 获取CAN设备的接口索引
@@ -310,7 +341,7 @@ can_handle can_device_init(const struct can_config *config)
 	addr.can_family = AF_CAN;
 	addr.can_ifindex = ifr.ifr_ifindex;
 
-	// 绑定套接字到CAN设备
+	// 绑定CAN套接字
 	ret = bind(socket_fd, (struct sockaddr *)&addr, sizeof(addr));
 	if (ret < 0) {
 		LOG_E("Bind CAN socket failed: %s", strerror(errno));
@@ -319,7 +350,7 @@ can_handle can_device_init(const struct can_config *config)
 		return NULL;
 	}
 
-	// 设置非阻塞模式
+	// 非阻塞模式
 	int flags = fcntl(socket_fd, F_GETFL, 0);
 	if (flags < 0 || fcntl(socket_fd, F_SETFL, flags | O_NONBLOCK) < 0) {
 		LOG_E("Set CAN socket to non-blocking mode failed: %s", strerror(errno));
@@ -328,14 +359,14 @@ can_handle can_device_init(const struct can_config *config)
 		return NULL;
 	}
 
-	// 配置过滤器
+	// 添加过滤器
 	if (!configure_can_filters(socket_fd, config->dev_filters, config->filter_num)) {
 		cleanup(NULL, socket_fd);
 		shutdown_can_interface(config);
 		return NULL;
 	}
 
-	// 分配CAN设备结构体
+	// 分配CAN句柄
 	handle = calloc(1, sizeof(struct can_device));
 	if (!handle) {
 		LOG_E("Memory allocation failed for CAN device");
@@ -346,7 +377,7 @@ can_handle can_device_init(const struct can_config *config)
 	handle->config = config;
 	handle->socket_fd = socket_fd;
 
-	// 创建停止信号文件描述符
+	// 创建停止事件文件描述符
 	handle->stop_fd = eventfd(0, EFD_NONBLOCK);
 	if (handle->stop_fd < 0) {
 		LOG_E("Create stop_fd failed: %s", strerror(errno));
@@ -373,7 +404,7 @@ can_handle can_device_init(const struct can_config *config)
 		return NULL;
 	}
 
-	// 添加停止信号到epoll
+	// 添加停止事件到epoll
 	struct epoll_event stop_event = { .events = EPOLLIN, .data.fd = handle->stop_fd };
 	if (epoll_ctl(handle->epfd, EPOLL_CTL_ADD, handle->stop_fd, &stop_event) < 0) {
 		LOG_E("Add stop_fd to epoll failed: %s", strerror(errno));
@@ -397,7 +428,7 @@ can_handle can_device_init(const struct can_config *config)
 /**
  * @brief 关闭CAN设备
  *
- * 关闭CAN套接字,停止读取线程,释放所有分配的资源.
+ * 停止线程,释放所有资源.
  *
  * @param handle CAN句柄
  */
@@ -415,8 +446,6 @@ void can_device_close(can_handle handle)
 	close(handle->epfd);
 	close(handle->stop_fd);
 	close(handle->socket_fd);
-
-	// 关闭CAN接口
 	shutdown_can_interface(handle->config);
 
 	free(handle);
@@ -442,6 +471,7 @@ bool can_device_write(can_handle handle, uint8_t *data, size_t len)
 	size_t remaining = len;
 	size_t offset = 0;
 
+	// 逐帧发送
 	while (remaining > 0) {
 		size_t chunk_size = remaining > CAN_MAX_DLEN ? CAN_MAX_DLEN : remaining;
 

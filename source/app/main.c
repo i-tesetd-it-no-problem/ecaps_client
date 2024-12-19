@@ -44,6 +44,7 @@
 #include "app/app_upload.h"
 #include "app/app_rs485.h"
 #include "app/app_can_task.h"
+#include "app/app_rs485_master.h"
 
 // LED 任务
 static const struct epoll_timer_task led_task = {
@@ -151,6 +152,14 @@ static const struct epoll_timer_task can_task = {
 	.period_ms = APP_CAN_TASK_PERIOD,
 };
 
+static const struct epoll_timer_task rs485_master_task = {
+	.task_name = "rs485 master task",
+	.f_init = app_rs485_master_init,
+	.f_entry = app_rs485_master_task,
+	.f_deinit = app_rs485_master_deinit,
+	.period_ms = APP_RS485_TASK_MASTER_PERIOD,
+};
+
 static volatile et_handle ept = NULL; // 监听句柄
 
 // 信号处理函数
@@ -191,16 +200,18 @@ int main(int argc, const char *argv[])
 	// 添加所有周期任务待监听
 #ifdef BOARD_ENV
 	epoll_timer_add_task(ept, &led_task);
-	epoll_timer_add_task(ept, &si7006_task);
-	epoll_timer_add_task(ept, &lmv358_task);
-	epoll_timer_add_task(ept, &digital_task);
-	epoll_timer_add_task(ept, &beep_task);
-	epoll_timer_add_task(ept, &fan_task);
-	epoll_timer_add_task(ept, &motor_task);
-	epoll_timer_add_task(ept, &ap3216c_task);
-	epoll_timer_add_task(ept, &max30102_task);
-	epoll_timer_add_task(ept, &rs485_task);
-	epoll_timer_add_task(ept, &can_task);
+	// epoll_timer_add_task(ept, &si7006_task);
+	// epoll_timer_add_task(ept, &lmv358_task);
+	// epoll_timer_add_task(ept, &digital_task);
+	// epoll_timer_add_task(ept, &beep_task);
+	// epoll_timer_add_task(ept, &fan_task);
+	// epoll_timer_add_task(ept, &motor_task);
+	// epoll_timer_add_task(ept, &ap3216c_task);
+	// epoll_timer_add_task(ept, &max30102_task);
+	// epoll_timer_add_task(ept, &rs485_task);
+	epoll_timer_add_task(ept, &rs485_master_task);
+
+	// epoll_timer_add_task(ept, &can_task);
 
 #else
 	epoll_timer_add_task(ept, &upload_task);

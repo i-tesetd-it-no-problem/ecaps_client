@@ -99,6 +99,14 @@ bool epoll_timer_add_task(et_handle handle, const struct epoll_timer_task *task_
 bool epoll_timer_remove_task(et_handle handle, const struct epoll_timer_task *task_info);
 
 /**
+ * @brief 轮询事件监听
+ * 
+ * @param handle epoll句柄
+ * @return int 0:正常退出, 1:错误退出
+ */
+int epoll_timer_run(et_handle handle);
+
+/**
  * @brief 停止事件监听
  * 
  * @param handle epoll句柄
@@ -106,13 +114,5 @@ bool epoll_timer_remove_task(et_handle handle, const struct epoll_timer_task *ta
  * @return false 失败
  */
 bool epoll_timer_stop(et_handle handle);
-
-/**
- * @brief 轮询事件监听
- * 
- * @param handle epoll句柄
- * @return int 0:正常退出, 1:错误退出
- */
-int epoll_timer_run(et_handle handle);
 
 #endif /* _EPOLL_TIMER_H */

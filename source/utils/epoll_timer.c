@@ -4,19 +4,19 @@
  * @brief 定时器任务事件驱动组件
  * @version 1.0
  * @date 2024-12-11
- * 
+ *
  * @copyright Copyright (c) 2024
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
  * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- * 
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- * 
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -24,7 +24,7 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
- * 
+ *
  */
 
 #include <string.h>
@@ -68,7 +68,7 @@ struct epoll_timer {
 
 /**
  * @brief 创建epoll监听句柄
- * 
+ *
  * @return et_handle 失败返回NULL,成功返回句柄
  */
 et_handle epoll_timer_create(void)
@@ -134,8 +134,8 @@ err_free_stop_fd:
 
 /**
  * @brief 销毁epoll句柄
- * 
- * @param handle 
+ *
+ * @param handle
  */
 void epoll_timer_destroy(et_handle handle)
 {
@@ -184,7 +184,7 @@ void epoll_timer_destroy(et_handle handle)
 
 /**
  * @brief 添加定时器任务到监听事件
- * 
+ *
  * @param handle epoll句柄
  * @param task_info 任务指针
  * @return true 成功
@@ -293,7 +293,7 @@ err_free_new_task:
 
 /**
  * @brief 从监听事件中移除定时器任务
- * 
+ *
  * @param handle epoll句柄
  * @param task_info 任务指针(需要匹配 f_entry)
  * @return true 成功
@@ -308,7 +308,8 @@ bool epoll_timer_remove_task(et_handle handle, const struct epoll_timer_task *ta
 
 	// 仅当 f_entry 非 NULL 时才能移除任务
 	if (task_info->f_entry == NULL) {
-		LOG_E("f_entry is NULL in epoll_timer_remove_task. Unable to identify the task.");
+		LOG_E("f_entry is NULL in epoll_timer_remove_task. Unable to identify "
+			  "the task.");
 		return false;
 	}
 
@@ -355,7 +356,7 @@ bool epoll_timer_remove_task(et_handle handle, const struct epoll_timer_task *ta
 
 /**
  * @brief 停止事件监听
- * 
+ *
  * @param handle epoll句柄
  * @return true 成功
  * @return false 失败
@@ -379,7 +380,7 @@ bool epoll_timer_stop(et_handle handle)
 
 /**
  * @brief 轮询事件监听
- * 
+ *
  * @param handle epoll句柄
  * @return int 0:正常退出, 1:错误退出
  */

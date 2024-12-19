@@ -42,14 +42,14 @@
  * NULL 代表无效数据
  * 
  */
-typedef void (*can_frame_handle)(struct can_frame *frame);
+typedef void (*can_frame_recv_cb)(struct can_frame *frame);
 struct can_config {
 	char *can_dev_name;				// `ifconfig -a` 显示的CAN名, 如 can0
 	uint32_t can_id;				// (11/29 bit)
 	size_t can_bitrate;				// can 比特率
 	struct can_filter *dev_filters; // 过滤器数组
 	size_t filter_num;				// 过滤器长度
-	can_frame_handle handle;		// CAN报文 处理函数
+	can_frame_recv_cb cb;			// CAN报文 处理函数
 };
 
 typedef struct can_device *can_handle; // CAN 句柄
@@ -60,7 +60,7 @@ typedef struct can_device *can_handle; // CAN 句柄
  * 初始化CAN套接字,设置接口,绑定套接字到CAN设备,创建epoll实例,等
  * 添加CAN套接字和eventfd到epoll
  * 成功后会启动读取线程
- * 每当读取成功一帧就会调用 can_frame_handle 函数指针
+ * 每当读取成功一帧就会调用 can_frame_recv_cb 函数指针
  *
  * @param config 用户配置信息
  * @return can_handle 初始化成功

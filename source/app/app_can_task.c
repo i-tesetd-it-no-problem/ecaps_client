@@ -41,7 +41,7 @@ static void app_can_frame_handle(struct can_frame *frame);
 // 允许接受的CAN ID
 static struct can_filter filts[] = {
 	{
-		.can_id = 0x1B0, // 测试 0x1B0
+		.can_id = 0x1B0, // 测试 0x1B0 就是本身
 		.can_mask = CAN_SFF_MASK,
 	},
 	{
@@ -61,7 +61,7 @@ static const struct can_config config = {
 	.can_id = 0x1B0,
 	.dev_filters = filts,
 	.filter_num = sizeof(filts) / sizeof(struct can_filter),
-	.handle = app_can_frame_handle,
+	.cb = app_can_frame_handle,
 };
 
 // CAN 报文处理
@@ -145,6 +145,7 @@ static void app_can_test(can_handle handle)
 	else
 		LOG_I("Can send success");
 }
+
 /**
  * @brief CAN 任务
  * 

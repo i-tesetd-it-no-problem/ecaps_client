@@ -87,6 +87,6 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
 # rm -rf build;cmake -B build -S . -G Ninja -DCMAKE_TOOLCHAIN_FILE=toolchain_board.cmake -DHOST_BUILD=OFF -DCMAKE_BUILD_TYPE=Debug
 # rm -rf build;cmake -B build -S . -G Ninja -DCMAKE_TOOLCHAIN_FILE=toolchain_board.cmake -DHOST_BUILD=OFF -DCMAKE_BUILD_TYPE=Release
 
-# cmake --build build --target clean
+# cmake --build build --clean-first -j 12 // 清理后重新编译
 # scp ./build/output/ECAPS wenshuyu@192.168.1.6:/home/wenshuyu/ecaps_client
 # scp ./build/output/test_logger wenshuyu@192.168.1.6:/home/wenshuyu/ecaps_client

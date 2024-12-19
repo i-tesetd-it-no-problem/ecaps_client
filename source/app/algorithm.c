@@ -11,8 +11,8 @@ const unsigned char uch_spo2_table[184] = { 95, 95, 95, 96, 96, 96, 97, 97, 97, 
 	36, 35, 34, 33, 31, 30, 29, 28, 27, 26, 25, 23, 22, 21, 20, 19, 17, 16, 15, 14, 12, 11, 10, 9,
 	7, 6, 5, 3, 2, 1 };
 static int an_dx[BUFFER_SIZE - MA4_SIZE];
-static int an_x[BUFFER_SIZE]; //ir
-static int an_y[BUFFER_SIZE]; //red
+static int an_x[BUFFER_SIZE];
+static int an_y[BUFFER_SIZE];
 
 void maxim_heart_rate_and_oxygen_saturation(unsigned int *pun_ir_buffer, int n_ir_buffer_length,
 	unsigned int *pun_red_buffer, int *pn_spo2, int *pch_spo2_valid, int *pn_heart_rate,
@@ -34,7 +34,6 @@ void maxim_heart_rate_and_oxygen_saturation(unsigned int *pun_ir_buffer, int n_i
 	int an_ratio[5], n_ratio_average;
 	int n_nume, n_denom;
 
-	// 移除IR信号的直流分量
 	un_ir_mean = 0;
 	for (k = 0; k < n_ir_buffer_length; k++)
 		un_ir_mean += pun_ir_buffer[k];
@@ -45,39 +44,33 @@ void maxim_heart_rate_and_oxygen_saturation(unsigned int *pun_ir_buffer, int n_i
 		an_x[k] = pun_ir_buffer[k] - un_ir_mean;
 	}
 
-	// 4点移动平均
 	for (k = 0; k < BUFFER_SIZE - MA4_SIZE; k++) {
 		n_denom = (an_x[k] + an_x[k + 1] + an_x[k + 2] + an_x[k + 3]);
 		an_x[k] = n_denom / 4;
 	}
 
-	// 获取平滑后的IR信号的差分
 	for (k = 0; k < BUFFER_SIZE - MA4_SIZE - 1; k++) {
 		an_dx[k] = (an_x[k + 1] - an_x[k]);
 	}
 
-	// 对an_dx进行2点移动平均
 	for (k = 0; k < BUFFER_SIZE - MA4_SIZE - 2; k++) {
 		an_dx[k] = (an_dx[k] + an_dx[k + 1]) / 2;
 	}
 
-	// 汉明窗
-	// 翻转波形以便使用峰值检测器检测谷值
 	for (i = 0; i < BUFFER_SIZE - HAMMING_SIZE - MA4_SIZE - 2; i++) {
 		s = 0;
 		for (k = i; k < i + HAMMING_SIZE; k++) {
 			s -= an_dx[k] * auw_hamm[k - i];
 		}
-		an_dx[i] = s / 1146; // 除以auw_hamm的和
+		an_dx[i] = s / 1146;
 	}
 
-	n_th1 = 0; // 阈值计算
+	n_th1 = 0;
 	for (k = 0; k < BUFFER_SIZE - HAMMING_SIZE; k++) {
 		n_th1 += (an_dx[k] > 0) ? an_dx[k] : (-an_dx[k]);
 	}
 	n_th1 = n_th1 / (BUFFER_SIZE - HAMMING_SIZE);
 
-	// 峰值位置实际上是原始信号中最尖锐位置的索引,因为我们翻转了信号
 	maxim_find_peaks(an_dx_peak_locs, &n_npks, an_dx, BUFFER_SIZE - HAMMING_SIZE, n_th1, 8, 5);
 
 	n_peak_interval_sum = 0;
@@ -85,7 +78,7 @@ void maxim_heart_rate_and_oxygen_saturation(unsigned int *pun_ir_buffer, int n_i
 		for (k = 1; k < n_npks; k++)
 			n_peak_interval_sum += (an_dx_peak_locs[k] - an_dx_peak_locs[k - 1]);
 		n_peak_interval_sum = n_peak_interval_sum / (n_npks - 1);
-		*pn_heart_rate = (int)(6000 / n_peak_interval_sum); // 每分钟心跳次数
+		*pn_heart_rate = (int)(6000 / n_peak_interval_sum);
 		*pch_hr_valid = 1;
 	} else {
 		*pn_heart_rate = -999;
@@ -95,19 +88,16 @@ void maxim_heart_rate_and_oxygen_saturation(unsigned int *pun_ir_buffer, int n_i
 	for (k = 0; k < n_npks; k++)
 		an_ir_valley_locs[k] = an_dx_peak_locs[k] + HAMMING_SIZE / 2;
 
-	// RED(=y)和IR(=X)的原始值
-	// 需要评估IR和RED PPG的直流和交流值
 	for (k = 0; k < n_ir_buffer_length; k++) {
 		an_x[k] = pun_ir_buffer[k];
 		an_y[k] = pun_red_buffer[k];
 	}
 
-	// 查找an_ir_valley_locs附近的精确最小值
 	n_exact_ir_valley_locs_count = 0;
 	for (k = 0; k < n_npks; k++) {
 		un_only_once = 1;
 		m = an_ir_valley_locs[k];
-		n_c_min = 16777216; // 2^24
+		n_c_min = 16777216;
 		if (m + 5 < BUFFER_SIZE - HAMMING_SIZE && m - 5 > 0) {
 			for (i = m - 5; i < m + 5; i++)
 				if (an_x[i] < n_c_min) {
@@ -122,19 +112,16 @@ void maxim_heart_rate_and_oxygen_saturation(unsigned int *pun_ir_buffer, int n_i
 		}
 	}
 	if (n_exact_ir_valley_locs_count < 2) {
-		*pn_spo2 = -999; // 由于信号比例超出范围,不使用SPO2
+		*pn_spo2 = -999;
 		*pch_spo2_valid = 0;
 		return;
 	}
 
-	// 4点移动平均
 	for (k = 0; k < BUFFER_SIZE - MA4_SIZE; k++) {
 		an_x[k] = (an_x[k] + an_x[k + 1] + an_x[k + 2] + an_x[k + 3]) / 4;
 		an_y[k] = (an_y[k] + an_y[k + 1] + an_y[k + 2] + an_y[k + 3]) / 4;
 	}
 
-	// 使用an_exact_ir_valley_locs,查找IR-Red的直流和交流分量以进行SPO2校准比例
-	// 在两个谷值位置之间查找原始IR * RED的AC/DC最大值
 	n_ratio_average = 0;
 	n_i_ratio_count = 0;
 
@@ -142,14 +129,12 @@ void maxim_heart_rate_and_oxygen_saturation(unsigned int *pun_ir_buffer, int n_i
 		an_ratio[k] = 0;
 	for (k = 0; k < n_exact_ir_valley_locs_count; k++) {
 		if (an_exact_ir_valley_locs[k] > BUFFER_SIZE) {
-			*pn_spo2 = -999; // 由于谷值位置超出范围,不使用SPO2
+			*pn_spo2 = -999;
 			*pch_spo2_valid = 0;
 			return;
 		}
 	}
 
-	// 查找两个谷值位置之间的最大值
-	// 并使用IR & RED的AC成分与DC成分的比例作为SPO2
 	for (k = 0; k < n_exact_ir_valley_locs_count - 1; k++) {
 		n_y_dc_max = -16777216;
 		n_x_dc_max = -16777216;
@@ -165,13 +150,13 @@ void maxim_heart_rate_and_oxygen_saturation(unsigned int *pun_ir_buffer, int n_i
 				}
 			}
 			n_y_ac = (an_y[an_exact_ir_valley_locs[k + 1]] - an_y[an_exact_ir_valley_locs[k]]) *
-				(n_y_dc_max_idx - an_exact_ir_valley_locs[k]); // RED
+				(n_y_dc_max_idx - an_exact_ir_valley_locs[k]);
 			n_y_ac = an_y[an_exact_ir_valley_locs[k]] +
 				n_y_ac / (an_exact_ir_valley_locs[k + 1] - an_exact_ir_valley_locs[k]);
 
 			n_y_ac = an_y[n_y_dc_max_idx] - n_y_ac;
 			n_x_ac = (an_x[an_exact_ir_valley_locs[k + 1]] - an_x[an_exact_ir_valley_locs[k]]) *
-				(n_x_dc_max_idx - an_exact_ir_valley_locs[k]); // IR
+				(n_x_dc_max_idx - an_exact_ir_valley_locs[k]);
 			n_x_ac = an_x[an_exact_ir_valley_locs[k]] +
 				n_x_ac / (an_exact_ir_valley_locs[k + 1] - an_exact_ir_valley_locs[k]);
 			n_x_ac = an_x[n_y_dc_max_idx] - n_x_ac;
@@ -184,12 +169,11 @@ void maxim_heart_rate_and_oxygen_saturation(unsigned int *pun_ir_buffer, int n_i
 		}
 	}
 
-	// 选择中位数值,因为PPG信号可能因心跳而变化
 	maxim_sort_ascend(an_ratio, n_i_ratio_count);
 	n_middle_idx = n_i_ratio_count / 2;
 
 	if (n_middle_idx > 1)
-		n_ratio_average = (an_ratio[n_middle_idx - 1] + an_ratio[n_middle_idx]) / 2; // 使用中位数
+		n_ratio_average = (an_ratio[n_middle_idx - 1] + an_ratio[n_middle_idx]) / 2;
 	else
 		n_ratio_average = an_ratio[n_middle_idx];
 
@@ -216,35 +200,31 @@ void maxim_heart_rate_and_oxygen_saturation(unsigned int *pun_ir_buffer, int n_i
 	int an_ratio[5], n_ratio_average;
 	int n_nume, n_denom;
 
-	// 计算DC均值并从IR中减去DC
 	un_ir_mean = 0;
 	for (k = 0; k < n_ir_buffer_length; k++)
 		un_ir_mean += pun_ir_buffer[k];
 	un_ir_mean = un_ir_mean / n_ir_buffer_length;
 
-	// 移除直流并反转信号,以便使用峰值检测器作为谷值检测器
 	for (k = 0; k < n_ir_buffer_length; k++)
 		an_x[k] = -1 * (pun_ir_buffer[k] - un_ir_mean);
 
-	// 4点移动平均
 	for (k = 0; k < n_ir_buffer_length - MA4_SIZE; k++) {
 		an_x[k] = (an_x[k] + an_x[k + 1] + an_x[k + 2] + an_x[k + 3]) / 4;
 	}
 
-	// 计算阈值
 	n_th1 = 0;
 	for (k = 0; k < n_ir_buffer_length; k++) {
 		n_th1 += an_x[k];
 	}
 	n_th1 = n_th1 / n_ir_buffer_length;
 	if (n_th1 < 30)
-		n_th1 = 30; // 最小允许值
+		n_th1 = 30;
 	if (n_th1 > 60)
-		n_th1 = 60; // 最大允许值
+		n_th1 = 60;
 
 	for (k = 0; k < 15; k++)
 		an_ir_valley_locs[k] = 0;
-	// 由于我们翻转了信号,使用峰值检测器作为谷值检测器
+
 	maxim_find_peaks(an_ir_valley_locs, &n_npks, an_x, n_ir_buffer_length, n_th1, 4, 15);
 
 	n_peak_interval_sum = 0;
@@ -259,31 +239,25 @@ void maxim_heart_rate_and_oxygen_saturation(unsigned int *pun_ir_buffer, int n_i
 		*pch_hr_valid = 0;
 	}
 
-	// 再次加载原始值以进行SPO2计算：RED(=y)和IR(=X)
 	for (k = 0; k < n_ir_buffer_length; k++) {
 		an_x[k] = pun_ir_buffer[k];
 		an_y[k] = pun_red_buffer[k];
 	}
 
-	// 查找an_ir_valley_locs附近的精确最小值
 	n_exact_ir_valley_locs_count = n_npks;
 
-	// 使用exact_ir_valley_locs,查找IR-Red的直流和交流分量以进行SPO2校准an_ratio
-	// 查找原始信号的AC/DC最大值
 	n_ratio_average = 0;
 	n_i_ratio_count = 0;
 	for (k = 0; k < 5; k++)
 		an_ratio[k] = 0;
 	for (k = 0; k < n_exact_ir_valley_locs_count; k++) {
 		if (an_ir_valley_locs[k] > n_ir_buffer_length) {
-			*pn_spo2 = -999; // 由于谷值位置超出范围,不使用SPO2
+			*pn_spo2 = -999;
 			*pch_spo2_valid = 0;
 			return;
 		}
 	}
 
-	// 查找两个谷值位置之间的最大值
-	// 并使用IR & RED的AC成分与DC成分的比例作为SPO2
 	for (k = 0; k < n_exact_ir_valley_locs_count - 1; k++) {
 		n_y_dc_max = -16777216;
 		n_x_dc_max = -16777216;
@@ -299,13 +273,13 @@ void maxim_heart_rate_and_oxygen_saturation(unsigned int *pun_ir_buffer, int n_i
 				}
 			}
 			n_y_ac = (an_y[an_ir_valley_locs[k + 1]] - an_y[an_ir_valley_locs[k]]) *
-				(n_y_dc_max_idx - an_ir_valley_locs[k]); // RED
+				(n_y_dc_max_idx - an_ir_valley_locs[k]);
 			n_y_ac = an_y[an_ir_valley_locs[k]] +
 				n_y_ac / (an_ir_valley_locs[k + 1] - an_ir_valley_locs[k]);
 
 			n_y_ac = an_y[n_y_dc_max_idx] - n_y_ac;
 			n_x_ac = (an_x[an_ir_valley_locs[k + 1]] - an_x[an_ir_valley_locs[k]]) *
-				(n_x_dc_max_idx - an_ir_valley_locs[k]); // IR
+				(n_x_dc_max_idx - an_ir_valley_locs[k]);
 			n_x_ac = an_x[an_ir_valley_locs[k]] +
 				n_x_ac / (an_ir_valley_locs[k + 1] - an_ir_valley_locs[k]);
 			n_x_ac = an_x[n_y_dc_max_idx] - n_x_ac;
@@ -318,12 +292,11 @@ void maxim_heart_rate_and_oxygen_saturation(unsigned int *pun_ir_buffer, int n_i
 		}
 	}
 
-	// 选择中位数值,因为PPG信号可能因心跳而变化
 	maxim_sort_ascend(an_ratio, n_i_ratio_count);
 	n_middle_idx = n_i_ratio_count / 2;
 
 	if (n_middle_idx > 1)
-		n_ratio_average = (an_ratio[n_middle_idx - 1] + an_ratio[n_middle_idx]) / 2; // 使用中位数
+		n_ratio_average = (an_ratio[n_middle_idx - 1] + an_ratio[n_middle_idx]) / 2;
 	else
 		n_ratio_average = an_ratio[n_middle_idx];
 
@@ -360,7 +333,7 @@ void maxim_peaks_above_min_height(
 				n_width++;
 			if (pn_x[i] > pn_x[i + n_width] && (*pn_npks) < 15) {
 				pn_locs[(*pn_npks)++] = i;
-				// 对于平坦的峰值,峰值位置是左边缘
+
 				i += n_width + 1;
 			} else
 				i += n_width;
@@ -383,7 +356,7 @@ void maxim_remove_close_peaks(int *pn_locs, int *pn_npks, int *pn_x, int n_min_d
 				pn_locs[(*pn_npks)++] = pn_locs[j];
 		}
 	}
-	// 按升序重新排序索引
+
 	maxim_sort_ascend(pn_locs, *pn_npks);
 }
 
