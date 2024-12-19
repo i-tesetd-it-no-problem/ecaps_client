@@ -71,7 +71,7 @@ typedef struct mb_mst *mb_mst_handle;
  *
  * @param opts 读写等回调函数指针
  * @param period_ms 轮训周期
- * @return mb_mst_handle 成功返回句柄，失败返回NULL
+ * @return mb_mst_handle 成功返回句柄,失败返回NULL
  */
 mb_mst_handle mb_mst_init(struct serial_opts *opts, size_t period_ms);
 

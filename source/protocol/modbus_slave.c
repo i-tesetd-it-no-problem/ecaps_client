@@ -285,7 +285,7 @@ static uint8_t _rtu_handle(mb_slv_handle handle)
 	uint16_t reg = handle->msg_state.pdu.read.reg_h << 8 | handle->msg_state.pdu.read.reg_l;
 	uint16_t reg_num = handle->msg_state.pdu.read.num_h << 8 | handle->msg_state.pdu.read.num_l;
 
-	for (uint16_t i = 0; i < handle->table_num; i++) {
+	for (size_t i = 0; i < handle->table_num; i++) {
 		work = &handle->work_table[i];
 		if (work && work->resp && MODBUS_CHECK_REG_RANGE(reg, reg_num, work->start, work->end)) {
 			res = work->resp(func, reg, reg_num, handle->data_in_out); // 用户回调处理
@@ -435,7 +435,7 @@ static uint16_t _dispatch_rtu_msg(mb_slv_handle handle)
  * @param slv_addr 			从机地址
  * @param table 			任务处理表
  * @param table_num 		表长
- * @return mb_slv_handle 	成功返回句柄，失败返回NULL
+ * @return mb_slv_handle 	成功返回句柄,失败返回NULL
  */
 mb_slv_handle mb_slv_init(
 	struct serial_opts *opts, uint8_t slv_addr, struct mb_slv_work *work_table, uint16_t table_num)
